@@ -1,0 +1,89 @@
+recipe_version: '2'
+name: Qwen3.8-Flash-Next-NVFP4
+model: RadixArk/Qwen3.8-Flash-Next-NVFP4
+runtime: sglang
+container: ghcr.io/thupalo/qwen38-flashnext-sm121:20260827
+command: |
+  python3 -m sglang.launch_server \
+    --model-path {model} \
+    --served-model-name {served_model_name} \
+    --trust-remote-code \
+    --tp-size {tensor_parallel} \
+    --quantization modelopt_fp4 \
+    --attention-backend {attention_backend} \
+    --fp4-gemm-backend {fp4_gemm_backend} \
+    --ple-offload-embedding \
+    --page-size 64 \
+    --mamba-ssm-dtype bfloat16 \
+    --mamba-radix-cache-strategy {mamba_radix_cache_strategy} \
+    --mamba-track-interval {mamba_track_interval} \
+    --max-mamba-cache-size {max_mamba_cache_size} \
+    --mem-fraction-static {gpu_memory_utilization} \
+    --chunked-prefill-size {chunked_prefill} \
+    --max-running-requests {max_num_seqs} \
+    --context-length {max_model_len} \
+    --speculative-algorithm {speculative_algorithm} \
+    --speculative-num-steps {speculative_num_steps} \
+    --speculative-eagle-topk {speculative_eagle_topk} \
+    --speculative-num-draft-tokens {speculative_num_draft_tokens} \
+    --speculative-attention-mode {speculative_attention_mode} \
+    --reasoning-parser {reasoning_parser} \
+    --tool-call-parser {tool_call_parser} \
+    --allow-auto-truncate \
+    --enable-metrics \
+    --enable-cache-report \
+    --disable-prefill-cuda-graph \
+    --cuda-graph-bs-decode {cuda_graph_bs} \
+    --host {host} \
+    --port {port} \
+    {extra_args}
+defaults:
+  port: 8000
+  host: 0.0.0.0
+  tensor_parallel: 2
+  gpu_memory_utilization: 0.78
+  max_model_len: 262144
+  max_num_seqs: 16
+  served_model_name: Qwen3.8-Flash-Next-NVFP4
+  attention_backend: flashinfer
+  tool_call_parser: auto
+  chunked_prefill: 4096
+  fp4_gemm_backend: flashinfer_cutlass
+  ple_offload_embedding: true
+  mamba_radix_cache_strategy: extra_buffer
+  mamba_track_interval: 64
+  max_mamba_cache_size: 97
+  speculative_algorithm: NEXTN
+  speculative_num_steps: 3
+  speculative_eagle_topk: 1
+  speculative_num_draft_tokens: 4
+  speculative_attention_mode: decode
+  reasoning_parser: auto
+  cuda_graph_bs: 1 2 3 4 5 6 7 8 10 12 14 16
+  extra_args: ''
+env:
+  NCCL_NET_PLUGIN: none
+  NCCL_NVLS_ENABLE: '0'
+  NCCL_DEBUG: WARN
+  TORCH_CUDA_ARCH_LIST: 12.1a
+  FLASHINFER_CUDA_ARCH_LIST: 12.1a
+  PYTORCH_CUDA_ALLOC_CONF: ''
+min_nodes: 2
+max_nodes: 2
+metadata:
+  description: Qwen3.8-Flash-Next (176B/6B-active MoE, NVFP4) on 2× DGX Spark, SGLang TP2 over CX7 RoCEv2, NEXTN 3/1/4 speculative decoding, SM121 QSA Triton fallback.
+  maintainer: tadeusz
+  source: https://github.com/MiaAI-Lab/Qwen3.8-Flash-Next-Dual-DGX-Sparks
+  image_source: mods/sm121-qsa-fallback/Dockerfile (same files as the sparkrun mod)
+  quantization: nvfp4
+  quant_bits: 4
+  model_dtype: nvfp4
+  model_params: 176B
+  model_vram: 135
+  base_image: lmsysorg/sglang:qwen38flashnext
+  base_image_digest: sha256:12d3392bdc8be8d35e9a95f191df6aef99c5114bdbefd41bfdc7e760e6d25ec1
+  num_layers: 48
+  num_kv_heads: 2
+  head_dim: 256
+  model_type: qwen4_exp
+model_revision: 7b719225242aacd3dbd3f9407468c2ee9a9d2594

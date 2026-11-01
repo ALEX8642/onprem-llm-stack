@@ -1,0 +1,6 @@
+.env
+searxng/settings.yml
+*.log
+__pycache__/
+.ansible_retry
+backups/

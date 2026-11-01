@@ -1,0 +1,22 @@
+---
+# Deploy the main Docker Compose stack on the head node.
+
+- name: Ensure stack directory exists
+  ansible.builtin.file:
+    path: "{{ stack_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Start Docker Compose stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ stack_dir }}"
+    files:
+      - docker-compose.yml
+    state: present
+    pull: missing
+  register: compose_result
+
+- name: Show changed containers
+  ansible.builtin.debug:
+    msg: "{{ compose_result.containers | default([]) | map(attribute='Name') | list }}"
+  when: compose_result.changed

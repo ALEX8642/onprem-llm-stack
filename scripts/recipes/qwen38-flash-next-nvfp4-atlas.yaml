@@ -1,0 +1,228 @@
+# PRODUCTION since 2026-10-24 (start-qwen38-flash-next-nvfp4-atlas.sh, switch-model.sh qwen38atlas).
+# Copy of @atlas/qwen3.8-flash-next-nvfp4-tp2 (atlas registry, 2026-10-16) with: image pinned to the sha
+# the recipe was measured on, our 262K context x 4 seqs, SGLang's served name and port (:8010) so
+# LiteLLM and the watchdog are unchanged, and gpu-mem 0.60 (586K-token KV pool; SGLang at 0.78 held
+# 337K). The A/B behind these choices: docs/MODELS.md "Atlas A/B".
+recipe_version: "2"
+model: nvidia/Qwen3.8-Flash-Next-NVFP4
+runtime: atlas
+# Engine: Atlas-Inf/atlas#174 (qwen3.8-flash-next TP=EP=2), merged as main b9a7edad8. The numbers below were
+# measured through sparkrun with this file on ghcr.io/atlas-inf/atlas-gb10:sha-b9a7eda, the image :latest
+# points to (spark binary sha256 b37c73a3...).
+container: ghcr.io/atlas-inf/atlas-gb10:sha-b9a7eda
+min_nodes: 2
+max_nodes: 2
+
+metadata:
+  description: |
+    Qwen3.8-Flash-Next (`model_type: qwen4_exp`) on TWO GB10s, tensor and expert
+    parallel (TP=EP=2): Gated DeltaNet and attention sharded, the 512 routed experts
+    split across the pair, mHC / PLE / QSA indexer / LM head replicated. The pair
+    talks over one ConnectX-7 cable: Atlas's own RDMA all-reduce, one-shot small
+    all-reduce and command ring carry the per-token traffic; NCCL is the fallback.
+    Engine options and the serve line are SparkQwen's RC16 8x32k profile (Enntity),
+    run unchanged on Atlas main.
+
+    EXACT: with speculation (MTP, up to 7 drafts) and prefix caching on, greedy
+    output at 1, 4 and 8 concurrent requests, and behind a ~4.4K-token cached
+    prefix, is identical to one-at-a-time decode with both off (sparkqwen
+    bench/greedy_eq.py, 8 prompts, thinking low: 8/8 in every case). The reference
+    texts hash 8199ce ... 1c6136, the same as SparkQwen's RC16 receipts on their
+    pair. TP=2 output is not bit-identical to one GB10 (BF16 rounding of the
+    tensor-parallel sums).
+
+    MEASURED 2026-10-16 with this file through `sparkrun run ... --cluster <pair>`
+    on ghcr.io/atlas-inf/atlas-gb10:sha-b9a7eda (= :latest) on one pair (reiner
+    + spark2; sparkrun hands the engine both PCIe halves of the port, so two RDMA
+    rails), one session per number, served name nvidia/Qwen3.8-Flash-Next-NVFP4:
+      Greedy output at C1 and C8 and behind the cached prefix at C4: 8/8
+        identical to the references above. tool_probe 21/21. 0 faults on both ranks.
+      MLPerf edge ST-995 (bfcl-subset --url, no overrides): overall 85.83,
+        normalized 85.48 (bars 82.72 / 81.65), 7,361 s. One GB10 on main
+        7ffd183f: 86.23 / 86.81, 13,245 s. The gap is the hallucination category
+        (94.51 -> 89.58, about 5 of 112 samples).
+      MLPerf edge agentic 2.5 h leg (`-o disable_thinking=true`, C=1): 1007
+        issued, 0 failed, score 0.5125, 2,247 s, TPOT median 26.1 ms, TTFT
+        median 493 ms. One GB10 on main 7ffd183f: 0.5053, 4,217 s, 48.2 ms,
+        990 ms. (check_compliance flags all_turns_observed 1006/1007 on every
+        run of this harness, the one-GB10 main runs included.)
+      sq_bench (thinking low; ranges over 2-3 repeats): C1 decode prose/code/JSON
+        52.9-53.8 / 68.0-68.8 / 62.5-63.5 tok/s; aggregate C1/C2/C4/C8
+        48.6-51.6 / 82.9-85.5 / 127.6-133.1 / 191.4-197.6 tok/s; cold TTFT
+        2K/8K/16K/28K 0.74 / 2.08 / 4.09-4.15 / 7.28-7.29 s; warm follow-up at
+        8K / 20K 0.18-0.21 / 0.19-0.24 s.
+    MEASURED 2026-10-14 (same pair, one rail, the PR tree before main's #175-#179):
+      KV pool: 3,112,608 tokens at util 0.88 (prefill MoE reads the checkpoint's
+        own planes; no K-major duplicate).
+      4 x 262K variant (max_num_seqs/max_batch_size 4, max_model_len 262144):
+        77K-token needle correct, TTFT 22.3 s, 54.3 tok/s; warm follow-up 0.3 s.
+
+    NUMERICS POLICY. This profile keeps SparkQwen's tensor-core MoE and mHC
+    decode (ATLAS_QWEN4EXP_MOE_TC, _HC_MMA, _MOE_NO_CLAMP, _HC_STAGE_FIT), which
+    set a new numerics baseline. Dropping those four and ATLAS_LOOP_STEER keeps
+    main's numerics, stays exact, and measured ST-995 85.53 / 86.14, the same
+    TTFT, C1 decode 51.8 / 65.2 / 63.3 tok/s and C4/C8 aggregate 113.2 / 160.9
+    tok/s (vs 129.3 / 193.4 for this profile, same pair and day: 2026-10-14,
+    one rail).
+
+    FABRIC. Each Spark needs an IPv4 address on the cable's netdev. If that netdev
+    carries more than one IPv4 address (e.g. a LAN address too), the engine picks
+    the RoCE v2 GID on the address the peer reached it at; ATLAS_RDMA_GID overrides.
+    NCCL's bootstrap and IB out-of-band sockets bind to the FIRST IPv4 address of
+    NCCL_SOCKET_IFNAME; if the peer cannot reach that address, NCCL init hangs
+    after the unique-ID exchange. If a node's cable netdev lists another address
+    first, fix it in the sparkrun cluster file, not here (cluster env overrides
+    sparkrun's per-host detection):
+      env:
+        NCCL_SOCKET_IFNAME: "=<netdev on node A>,<netdev on node B>"  # exact names; each
+                            # node matches only its own up netdev the peer can reach
+        NCCL_IB_ADDR_RANGE: <cable subnet, e.g. 10.99.2.0/30>   # NCCL's own GID choice
+    One rail is enough: striping over both PCIe halves of the port measured no
+    meaningful gain.
+
+    BOTH RANKS MUST LOAD THE SAME cuBLAS (the image's CUDA 13.0). With 13.1 on
+    one rank and 13.0 on the other, cached-prefix output stopped matching the
+    uncached output; the engine now refuses to start ranks on different
+    libcublasLt versions. Same binary, profile and util on both ranks: the ranks
+    refuse to start otherwise.
+
+    BF16 KV only: the QSA indexer requires it.
+  maintainer: atlas-inf
+  category: general
+  model_params: 180B
+  model_dtype: nvfp4
+  quantization: nvfp4
+  kv_dtype: bf16
+
+defaults:
+  port: 8010
+  host: 0.0.0.0
+  kernel_target: qwen3.8-flash-next
+  tensor_parallel: 2
+  ep_size: 2
+  max_model_len: 262144
+  max_prefill_tokens: 16384
+  kv_cache_dtype: bf16
+  gpu_memory_utilization: 0.60   # registry default 0.88; floor ~0.58 here
+  oom_guard_mb: 4096
+  max_num_seqs: 4
+  max_batch_size: 4
+  served_model_name: Qwen3.8-Flash-Next-NVFP4
+  speculative: true
+  num_drafts: 7
+  enable_prefix_caching: true
+  fast_load_prefetch_shards: true
+  default_chat_template_kwargs: "'{\"reasoning_effort\":\"low\"}'"
+
+env:
+  ATLAS_EP_PROTOCOL: "v2"
+  ATLAS_RDMA_ALLREDUCE: "1"
+  ATLAS_RDMA_ONESHOT: "1"
+  ATLAS_RDMA_PAIR_CHAIN: "1"
+  ATLAS_GLM_CMD_RDMA: "1"
+  ATLAS_QWEN4EXP_DECODE_GRAPH: "1"
+  ATLAS_QWEN4EXP_DECODE_GRAPH_COLLECTIVES: "1"
+  ATLAS_QWEN4EXP_HC_FAST: "1"
+  ATLAS_QWEN4EXP_LMHEAD_SPLIT: "1"
+  ATLAS_QWEN4EXP_LMHEAD_BATCHM: "1"
+  ATLAS_QWEN4EXP_EXACT_VERIFY: "1"
+  ATLAS_QWEN4EXP_MOE_FAST: "1"
+  ATLAS_QWEN4EXP_DECODE_FUSE: "1"
+  ATLAS_QWEN4EXP_BATCH_FAST: "1"
+  ATLAS_QWEN4EXP_MTP_DEPTH: "7"
+  ATLAS_MTP_SINGLE_DEPTH_ADAPT: "1"
+  ATLAS_QWEN4EXP_DRAFT_HEAD_NVFP4: "1"
+  ATLAS_QWEN4EXP_PREFILL_MOE: "1"
+  ATLAS_QWEN4EXP_PREFILL_GDN: "1"
+  ATLAS_QWEN4EXP_PREFILL_QSA_SCORE: "1"
+  ATLAS_QWEN4EXP_PREFILL_HC: "1"
+  ATLAS_QWEN4EXP_DECODE_GRAPH_WIDE: "1"
+  ATLAS_QWEN4EXP_BATCH_SMALL: "1"
+  ATLAS_QWEN4EXP_PREFILL_SP: "1"
+  ATLAS_QWEN4EXP_PREFILL_MOE_W2: "1"
+  ATLAS_LT_KCHAIN_PIN: "1"
+  ATLAS_QWEN4EXP_PREFILL_BA_ROWS: "1"
+  ATLAS_QWEN4EXP_PREFILL_FP8_W2: "1"
+  ATLAS_QWEN4EXP_PREFILL_SP_SHARED: "1"
+  ATLAS_QWEN4EXP_PREFILL_SP_PIPE: "1"
+  ATLAS_QWEN4EXP_PREFILL_SP_RS_PIPE: "1"
+  ATLAS_QWEN4EXP_PREFILL_QSA_SPLIT: "1"
+  ATLAS_QWEN4EXP_PREFILL_SP_ROUTE: "1"
+  ATLAS_QWEN4EXP_PREFILL_MIDCHUNK_CKPT: "1"
+  ATLAS_QWEN4EXP_CKPT_AUX_SHARE: "1"
+  ATLAS_QWEN4EXP_AUX_PINNED: "1"
+  ATLAS_QWEN4EXP_PREFILL_HOST_IDS: "1"
+  ATLAS_QWEN4EXP_QSA_REUSE: "1"
+  ATLAS_QWEN4EXP_SP_PREALLOC: "1"
+  ATLAS_PLE_WARM_BG: "1"
+  ATLAS_MTP_MAX_SEQS: "8"
+  ATLAS_MTP_GATE_FORCE: "1"
+  ATLAS_MTP_DYNAMIC_DEPTH: "1"
+  ATLAS_MTP_DEEP_MAX_SEQS: "2"
+  ATLAS_QWEN4EXP_MTP_KV_KEEP: "1"
+  ATLAS_NO_MTP_DCUT: "1"
+  ATLAS_QWEN4EXP_MTP_DRAFT_TP: "1"
+  ATLAS_PLE_NVME_KEEPALIVE_MS: "10"
+  ATLAS_PLE_FAULT_POOL: "1"
+  ATLAS_VERIFY_PICK_PAR: "1"
+  ATLAS_QWEN4EXP_HC_WIDE: "1"
+  ATLAS_QWEN4EXP_MTP_GROUPED_NORM: "1"
+  ATLAS_GLM_ZERO_ROWS: "1"
+  ATLAS_QWEN4EXP_EOS_BAN: "1"
+  ATLAS_QWEN4EXP_QKV_ROWS_2D: "1"
+  ATLAS_QWEN4EXP_VERIFY_BT_PINNED: "1"
+  ATLAS_QWEN4EXP_EXACT_DEFER: "1"
+  ATLAS_QWEN4EXP_QSA_KEY_ONLY: "1"
+  ATLAS_QWEN4EXP_QSA_COMMIT_ROWS: "1"
+  # Ours (2026-10-24): the API-level "spinning" detector counts short assistant turns in the history and
+  # bans <tool_call> once it sees 8 of them. Voice chats (Home Assistant) are all short turns, so it fired
+  # and Atlas returned one-word replies with no tool call. This keeps the detector but stops the ban.
+  ATLAS_LOOP_NO_SUPPRESS: "1"
+  ATLAS_CONTENT_LOOP_WATCHDOG: "1"
+  ATLAS_CONTENT_LOOP_MIN_REPEATS: "32"
+  ATLAS_LOOP_STEER: "1"
+  ATLAS_QWEN4EXP_FINISH_LEAF: "1"
+  ATLAS_QWEN4EXP_QSA_TOPK_WIDE: "1"
+  ATLAS_QWEN4EXP_QSA_DECODE_ROWS: "1"
+  ATLAS_QWEN4EXP_MOE_TC: "1"
+  ATLAS_QWEN4EXP_MOE_NO_CLAMP: "1"
+  ATLAS_QWEN4EXP_HC_STAGE_FIT: "1"
+  ATLAS_QWEN4EXP_HC_MMA: "1"
+  ATLAS_QWEN4EXP_QSA_SPARE_MAX: "288"
+  ATLAS_QWEN4EXP_PREFILL_ROWINV: "1"
+  ATLAS_QWEN4EXP_GDN_COMMIT_FUSE: "1"
+  ATLAS_QWEN4EXP_QSA_COMMIT_TABLE: "1"
+  ATLAS_QWEN4EXP_KV_LOOKAHEAD: "64"
+  ATLAS_QWEN4EXP_PREFILL_MULTI: "1"
+  ATLAS_PREFILL_CODISPATCH: "1"
+  ATLAS_PREFILL_CODISPATCH_WINDOW_MS: "20"
+  ATLAS_PREFILL_CODISPATCH_SETTLE_MS: "3"
+  ATLAS_QWEN4EXP_PREFILL_MOE_NODUP: "1"
+  ATLAS_QWEN4EXP_LMHEAD_SPLIT_VERIFY: "1"
+  ATLAS_RDMA_ONESHOT_MAX: "8388608"
+  ATLAS_MTP_DFLASH_CTX_SCOPED: "1"
+  ATLAS_QWEN4EXP_ROWS32_TILE: "1"
+  ATLAS_QWEN4EXP_PREFILL_MULTI_CACHED: "1"
+  ATLAS_QWEN4EXP_W4_ROWS: "1"
+  ATLAS_QWEN4EXP_W4_ROWS_WIDE: "1"
+  ATLAS_QWEN4EXP_PREFILL_GEMM_RASTER: "1"
+  NCCL_ALGO: "Ring"
+  NCCL_BUFFSIZE: "33554432"
+  NCCL_CROSS_NIC: "0"
+  NCCL_CUMEM_ENABLE: "0"
+  NCCL_CUMEM_HOST_ENABLE: "0"
+  NCCL_DEBUG: "WARN"
+  NCCL_DMABUF_ENABLE: "0"
+  NCCL_IB_ADDR_FAMILY: "AF_INET"
+  NCCL_IB_DISABLE: "0"
+  NCCL_IB_RETRY_CNT: "7"
+  NCCL_IB_ROCE_VERSION_NUM: "2"
+  NCCL_IB_TIMEOUT: "22"
+  NCCL_MAX_NCHANNELS: "2"
+  NCCL_MIN_NCHANNELS: "1"
+  NCCL_NET: "IB"
+  NCCL_NET_GDR_C2C: "0"
+  NCCL_NET_GDR_LEVEL: "0"
+  NCCL_NVLS_ENABLE: "0"
+  NCCL_PROTO: "Simple"
+  RUST_LOG: "info"

@@ -1,0 +1,140 @@
+# ============================================================================
+#  Family AI Stack — ai-stack/worker-compose.yml  (WORKER NODE: worker)
+#
+#  Memory (worker, ~16-17 GB available with the LLM rank loaded):
+#    chatterbox      ~4-5 GB  (loaded on first TTS request)
+#    Remaining       ~10 GB   (headroom for KV cache growth on the TP1 shard)
+#
+#  ACTIVE SERVICES:
+#    chatterbox         :8004  — TTS server (GPU); accessed via tts-proxy, not OpenWebUI directly
+#    tts-proxy          :8006  — emotion proxy: OpenAI /v1/audio/speech → Chatterbox /tts + exaggeration
+#    wyoming-openai-tts :10300 — Wyoming→Chatterbox bridge for Home Assistant (bypasses proxy)
+#    searxng            :8888  — private web search (JSON format for deep research tool)
+#    glances            :61208 — system/GPU monitor (worker node)
+#
+#  REPLACED:
+#    tika :9998 — removed; document extraction moved to Docling on head (head).
+#                 Docling is structure-aware (tables, headers) — better RAG quality.
+#                 To restore Tika: uncomment the service block below.
+#
+#  Bring up:  cd ~/ai-stack && docker compose -f worker-compose.yml up -d
+#  Stop:      cd ~/ai-stack && docker compose -f worker-compose.yml down
+# ============================================================================
+
+services:
+
+  # faster-whisper: RETIRED 2026-10-11. It never transcribed anything (arm64 CTranslate2 has no CUDA,
+  # and the model name was rejected). Speech-to-text now goes head stt-bridge -> NAS's Wyoming
+  # faster-whisper (see docker-compose.yml). Old block: git show 9a1cf59:worker-compose.yml
+
+  # tika:
+  #   # Apache Tika — replaced by Docling on head for better RAG quality.
+  #   # Restore this block if you need broad format support (email, archives, CAD, etc.)
+  #   # and update open-webui env: CONTENT_EXTRACTION_ENGINE=tika + TIKA_SERVER_URL.
+  #   image: apache/tika:latest-full
+  #   container_name: tika
+  #   ports:
+  #     - "9998:9998"
+  #   restart: unless-stopped
+
+  chatterbox:
+    image: chatterbox-tts-server:cu130
+    container_name: chatterbox
+    ports:
+      - "8004:8004"
+    volumes:
+      - /home/ai/Chatterbox-TTS-Server/hf_cache:/app/hf_cache
+      - /home/ai/Chatterbox-TTS-Server/model_cache:/app/model_cache
+      - /home/ai/Chatterbox-TTS-Server/reference_audio:/app/reference_audio
+      - /home/ai/Chatterbox-TTS-Server/outputs:/app/outputs
+      - /home/ai/Chatterbox-TTS-Server/voices:/app/voices
+      - /home/ai/Chatterbox-TTS-Server/logs:/app/logs
+      - /home/ai/Chatterbox-TTS-Server/config.yaml:/app/config.yaml
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      # TTS_BF16 stays off (decided 2026-10-11 after a listen test): BF16 was only ~20-25% faster
+      # (short sentence 0.55 -> 0.42 s) and the user preferred the float32 voice. GPU memory is
+      # about the same (4.8 vs 5.0 GB). The real voice-latency win was delaying OpenWebUI's
+      # background jobs instead (litellm_hooks.py), since they compete for this GPU.
+      - TTS_BF16=off
+    deploy:
+      resources:
+        reservations:
+          devices:
+            # CDI, not the legacy `driver: nvidia` hook: with cgroup v2 + systemd, any
+            # `systemctl daemon-reload` (snapd does them) silently revokes a legacy-hook
+            # container's /dev/nvidia* access ("Failed to initialize NVML: Unknown Error").
+            # Needs /etc/cdi/nvidia.yaml; regenerate it after every driver update.
+            - driver: cdi
+              device_ids: [nvidia.com/gpu=all]
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  tts-proxy:
+    build: /home/ai/ai-stack/tts-proxy
+    container_name: tts-proxy
+    ports:
+      - "8006:8006"
+    environment:
+      - CHATTERBOX_URL=http://chatterbox:8004
+    depends_on:
+      - chatterbox
+    restart: unless-stopped
+
+  wyoming-openai-tts:
+    image: ghcr.io/roryeckel/wyoming_openai:latest
+    container_name: wyoming-openai-tts
+    ports:
+      - "10300:10300"
+    environment:
+      - TTS_OPENAI_URL=http://chatterbox:8004/v1
+      - TTS_OPENAI_KEY=none
+      - TTS_BACKEND=OPENAI
+      - TTS_MODELS=tts-1
+      - TTS_VOICES=Alexander.wav Ryan.wav Olivia.wav Emily.wav
+      - WYOMING_URI=tcp://0.0.0.0:10300
+      - WYOMING_LANGUAGES=en
+      - WYOMING_LOG_LEVEL=INFO
+    depends_on:
+      - chatterbox
+    restart: unless-stopped
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    ports:
+      - "8888:8080"
+    volumes:
+      - /home/ai/ai-stack/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    environment:
+      - SEARXNG_BASE_URL=http://worker:8888/
+    restart: unless-stopped
+
+  glances:
+    image: nicolargo/glances:latest-full
+    container_name: glances
+    hostname: worker
+    pid: host
+    ports:
+      - "61208:61208"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /etc/os-release:/etc/os-release:ro
+    environment:
+      - GLANCES_OPT=-w --enable-plugin gpu
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    deploy:
+      resources:
+        reservations:
+          devices:
+            # CDI, not the legacy `driver: nvidia` hook: with cgroup v2 + systemd, any
+            # `systemctl daemon-reload` (snapd does them) silently revokes a legacy-hook
+            # container's /dev/nvidia* access ("Failed to initialize NVML: Unknown Error").
+            # Needs /etc/cdi/nvidia.yaml; regenerate it after every driver update.
+            - driver: cdi
+              device_ids: [nvidia.com/gpu=all]
+              capabilities: [gpu]
+    restart: unless-stopped

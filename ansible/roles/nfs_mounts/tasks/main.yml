@@ -1,0 +1,29 @@
+---
+# Mount NAS NFS model library on both Spark nodes.
+# Prerequisite: create the "models" share in NAS and export it via NFS first.
+# See docs/HARDWARE.md for NAS setup instructions.
+
+- name: Install nfs-common
+  become: true
+  ansible.builtin.apt:
+    name: nfs-common
+    state: present
+    update_cache: false
+
+- name: Create NFS mount point
+  become: true
+  ansible.builtin.file:
+    path: "{{ nfs_models_mount }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0755"
+
+- name: Mount model library from NAS
+  become: true
+  ansible.posix.mount:
+    path: "{{ nfs_models_mount }}"
+    src: "{{ nfs_server }}:{{ nfs_models_export }}"
+    fstype: nfs
+    opts: "rw,soft,timeo=300,retrans=3,_netdev,nofail,x-systemd.automount"  # nofail: a NAS outage must never block boot
+    state: mounted

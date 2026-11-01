@@ -1,0 +1,109 @@
+---
+# Deploy monitoring, earlyoom, and swap config on all nodes.
+# head: Glances is in the main docker-compose (managed by docker_stack role).
+# worker: worker-compose.yml (Glances, Chatterbox, tts-proxy, ...) deployed here.
+# Both nodes: 16 GB swap file + earlyoom.
+#
+# Swap was re-added on both nodes 2026-08-08, reversing an earlier "no swap" decision (see
+# docs/HISTORY.md "Models"): swap absorbs pressure before earlyoom has to kill anything.
+# This role previously *disabled* swap — fixed 2026-09-26 so a rebuild matches the live nodes.
+
+# --- Swap: 16 GB /swap.img on all nodes ---
+
+- name: Check for existing swap file
+  become: true
+  ansible.builtin.stat:
+    path: /swap.img
+  register: swapfile
+
+- name: Create 16 GB swap file
+  become: true
+  when: not swapfile.stat.exists
+  ansible.builtin.shell: |
+    fallocate -l 16G /swap.img && chmod 600 /swap.img && mkswap /swap.img
+  args:
+    creates: /swap.img
+
+- name: Unmask swap.img.swap (older runs of this role masked it)
+  become: true
+  ansible.builtin.systemd:
+    name: swap.img.swap
+    masked: false
+  ignore_errors: true
+
+- name: Ensure swap file is in /etc/fstab
+  become: true
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '^/swap\.img\s'
+    line: "/swap.img\tnone\tswap\tsw\t0\t0"
+
+- name: Enable swap
+  become: true
+  ansible.builtin.command: swapon -a
+  changed_when: false
+
+# --- earlyoom: install and configure on all nodes ---
+
+- name: Install earlyoom
+  become: true
+  ansible.builtin.apt:
+    name: earlyoom
+    state: present
+    update_cache: false
+
+- name: Configure earlyoom args
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/default/earlyoom
+    mode: "0644"
+    content: |
+      # -m 2    : trigger at 2% available memory (~2.5 GB on 128 GB DGX Spark)
+      # -s 80   : swap backstop (no-ops if swap is disabled)
+      # --prefer: kill inference workloads first under OOM (controlled death > crash)
+      # --avoid : protect core system services and Docker daemon
+      EARLYOOM_ARGS="-m 2 -s 80 --prefer '(vllm|VLLM|sglang|llama-server|llama-cli|trtllm|tritonserver|ray|python3|python)' --avoid '(systemd|sshd|dockerd|containerd|dbus-daemon|NetworkManager)'"
+  notify: restart earlyoom
+
+- name: Enable and start earlyoom
+  become: true
+  ansible.builtin.systemd:
+    name: earlyoom
+    enabled: true
+    state: started
+
+# --- CDI spec: GPU containers request nvidia.com/gpu=all via CDI (all nodes) ---
+# The legacy `driver: nvidia` hook loses /dev/nvidia* on any systemd daemon-reload under
+# cgroup v2 ("Failed to initialize NVML: Unknown Error"), so both compose files use CDI.
+# Regenerate after every driver update (re-run this role, or the command below by hand).
+
+- name: Generate NVIDIA CDI spec
+  become: true
+  ansible.builtin.command: nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+  changed_when: true
+
+# --- worker only: worker stack (Glances, Chatterbox, tts-proxy, ...) from worker-compose.yml ---
+# (A standalone Glances container used to be deployed here too; it duplicated the one in
+# worker-compose.yml under the same name, so it was removed 2026-10-11.)
+
+- name: Deploy worker-compose.yml to worker
+  when: inventory_hostname == 'worker'
+  ansible.builtin.copy:
+    src: "{{ stack_dir }}/worker-compose.yml"
+    dest: "{{ stack_dir }}/worker-compose.yml"
+    mode: "0644"
+
+- name: Copy .env to worker
+  when: inventory_hostname == 'worker'
+  ansible.builtin.copy:
+    src: "{{ stack_dir }}/.env"
+    dest: "{{ stack_dir }}/.env"
+    mode: "0600"
+
+- name: Start Chatterbox on worker
+  when: inventory_hostname == 'worker'
+  community.docker.docker_compose_v2:
+    project_src: "{{ stack_dir }}"
+    files:
+      - worker-compose.yml
+    state: present

@@ -1,0 +1,184 @@
+{
+ "base": "http://head:8010/v1",
+ "model": "Qwen3.8-Flash-Next-NVFP4",
+ "started": "2026-10-24T14:47:33",
+ "speed": {
+  "off": {
+   "prose": {
+    "tps": 38.4,
+    "ttft": 0.193,
+    "tok": 405
+   },
+   "narrative": {
+    "tps": 37.7,
+    "ttft": 0.181,
+    "tok": 485
+   },
+   "summary": {
+    "tps": 41.3,
+    "ttft": 0.177,
+    "tok": 276
+   },
+   "coding": {
+    "tps": 59.7,
+    "ttft": 0.192,
+    "tok": 989
+   },
+   "math": {
+    "tps": 60.1,
+    "ttft": 0.203,
+    "tok": 935
+   },
+   "json": {
+    "tps": 56.7,
+    "ttft": 0.185,
+    "tok": 804
+   },
+   "html": {
+    "tps": 59.1,
+    "ttft": 0.167,
+    "tok": 1024
+   },
+   "format": {
+    "tps": 49.0,
+    "ttft": 0.172,
+    "tok": 414
+   }
+  },
+  "on": {
+   "math": {
+    "tps": 52.4,
+    "ttft": 0.283,
+    "tok": 504
+   },
+   "coding": {
+    "tps": 43.2,
+    "ttft": 0.271,
+    "tok": 4096
+   }
+  },
+  "off_median_tps": 56.7,
+  "on_median_tps": 52.4
+ },
+ "concurrent": {
+  "x2": {
+   "per_stream_median_tps": 34.4,
+   "aggregate_tps": 60.4,
+   "max_ttft": 0.196
+  },
+  "x4": {
+   "per_stream_median_tps": 30.3,
+   "aggregate_tps": 101.9,
+   "max_ttft": 0.42
+  }
+ },
+ "multiturn": {
+  "prompt_tokens": 22437,
+  "turn1_ttft": 7.65,
+  "turn2_ttft": 0.29,
+  "turn2_correct": true,
+  "prefix_reuse_speedup": 26.3
+ },
+ "needle": {
+  "prompt_tokens": 93340,
+  "ttft": 25.5,
+  "prefill_tps": 3654,
+  "correct": true,
+  "answer": "7-3-9-1-4"
+ },
+ "tools": {
+  "think_off": {
+   "parsed": true,
+   "leaked_into_content": false,
+   "raw": {
+    "name": "get_weather",
+    "arguments": "{\"city\": \"Toronto\", \"unit\": \"celsius\"}"
+   },
+   "content": "I'll check the current weather in Toronto for you.\n\n"
+  },
+  "think_on": {
+   "parsed": true,
+   "leaked_into_content": false,
+   "raw": {
+    "name": "get_weather",
+    "arguments": "{\"city\": \"Toronto\", \"unit\": \"celsius\"}"
+   },
+   "content": "\n\n"
+  }
+ },
+ "reasoning": {
+  "reasoning_chars": 134,
+  "content": "\n\nNo",
+  "think_tags_in_content": false
+ },
+ "quiz": {
+  "score": "12/12",
+  "items": [
+   {
+    "q": "What is 17 * 23? Answer with just the number.",
+    "ok": true,
+    "a": "391"
+   },
+   {
+    "q": "How many r's are in the word 'strawberry'? Answer ",
+    "ok": true,
+    "a": "3"
+   },
+   {
+    "q": "What is the capital of Australia? One word.",
+    "ok": true,
+    "a": "Canberra"
+   },
+   {
+    "q": "If all bloops are razzies and all razzies are lazz",
+    "ok": true,
+    "a": "Yes"
+   },
+   {
+    "q": "What is the derivative of x^3 * sin(x)? Give the e",
+    "ok": true,
+    "a": "\\(3x^2\\sin(x) + x^3\\cos(x)\\)"
+   },
+   {
+    "q": "A bat and a ball cost $1.10 total. The bat costs $",
+    "ok": true,
+    "a": "5"
+   },
+   {
+    "q": "What is the smallest prime number greater than 100",
+    "ok": true,
+    "a": "101"
+   },
+   {
+    "q": "Which planet has the most confirmed moons as of 20",
+    "ok": true,
+    "a": "Saturn"
+   },
+   {
+    "q": "Sort these numbers ascending and output them comma",
+    "ok": true,
+    "a": "3, 7, 19, 21, 42, 88"
+   },
+   {
+    "q": "What is the sum of the interior angles of a hexago",
+    "ok": true,
+    "a": "720"
+   },
+   {
+    "q": "Convert binary 101101 to decimal. Just the number.",
+    "ok": true,
+    "a": "45"
+   },
+   {
+    "q": "Who wrote 'Pride and Prejudice'? Full name.",
+    "ok": true,
+    "a": "Jane Austen"
+   }
+  ]
+ },
+ "vision": {
+  "answer": "Red",
+  "correct": true
+ },
+ "finished": "2026-10-24T14:52:33"
+}

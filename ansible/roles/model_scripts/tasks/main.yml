@@ -1,0 +1,77 @@
+---
+# Ensure model management scripts are executable and in PATH.
+
+- name: Make all scripts executable
+  ansible.builtin.file:
+    path: "{{ stack_dir }}/scripts/{{ item }}"
+    mode: "0755"
+  loop:
+    - stop-model.sh
+    - start-minimax.sh
+    - start-qwen3.sh
+    - start-fallback.sh
+    - switch-model.sh
+    - model_control_api.py
+
+- name: Add ai-stack/scripts to PATH in .bashrc
+  ansible.builtin.lineinfile:
+    path: "/home/{{ ansible_user }}/.bashrc"
+    line: 'export PATH="$HOME/ai-stack/scripts:$PATH"'
+    state: present
+    regexp: 'ai-stack/scripts'
+
+# --- Model control API: host-level service backing the admin-only "switch_model"
+# OpenWebUI tool (functions/switch_model.py). Head only — this is where
+# switch-model.sh and docker-compose.yml actually live and run.
+
+- name: Deploy model-control-api systemd unit (head only)
+  when: inventory_hostname == 'head'
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/ai-stack-model-control.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=ai-stack model control API (admin-only model switch trigger)
+      After=network.target
+
+      [Service]
+      Type=simple
+      User={{ ansible_user }}
+      WorkingDirectory={{ stack_dir }}
+      EnvironmentFile={{ stack_dir }}/.env
+      ExecStart=/usr/bin/python3 {{ stack_dir }}/scripts/model_control_api.py
+      Restart=on-failure
+      RestartSec=5
+      # Models started via /switch (dashboard, chat tool, model-watchdog) run in this unit's cgroup.
+      # The default KillMode=control-group would kill the running model on every restart of this API.
+      KillMode=process
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: restart model-control-api
+
+- name: Enable and start model-control-api (head only)
+  when: inventory_hostname == 'head'
+  become: true
+  ansible.builtin.systemd:
+    name: ai-stack-model-control
+    daemon_reload: true
+    enabled: true
+    state: started
+
+# --- Reboot control: the MU/TH/UR dashboard's "Reboot head" button shells out
+# to `sudo systemctl reboot` as the service user (model_control_api.py's /reboot
+# endpoint). Scope the NOPASSWD grant to that one command only — not a blanket
+# sudoers entry — since this is reachable from anything on the LAN with the
+# bearer token (see docs/STATUS.md's LAN-exposure note on this service).
+
+- name: Grant ai-stack-model-control NOPASSWD reboot via sudoers (head only)
+  when: inventory_hostname == 'head'
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/ai-stack-model-control
+    mode: "0440"
+    validate: "visudo -cf %s"
+    content: |
+      {{ ansible_user }} ALL=(root) NOPASSWD: /usr/bin/systemctl reboot

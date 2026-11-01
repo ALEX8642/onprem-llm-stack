@@ -1,0 +1,29 @@
+---
+# Main playbook — runs all roles in order.
+# Usage: ansible-playbook -i hosts.yml site.yml
+#
+# Individual roles can be run with tags:
+#   ansible-playbook -i hosts.yml site.yml --tags nfs
+#   ansible-playbook -i hosts.yml site.yml --tags docker
+#   ansible-playbook -i hosts.yml site.yml --tags monitoring
+#   ansible-playbook -i hosts.yml site.yml --tags opencode
+
+- name: Configure all Spark cluster nodes
+  hosts: spark_cluster
+  become: false
+  roles:
+    - role: nfs_mounts
+      tags: [nfs]
+    - role: monitoring
+      tags: [monitoring]
+
+- name: Configure head node only (Docker stack + scripts)
+  hosts: head
+  become: false
+  roles:
+    - role: docker_stack
+      tags: [docker]
+    - role: model_scripts
+      tags: [scripts]
+    - role: opencode
+      tags: [opencode]

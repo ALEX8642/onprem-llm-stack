@@ -1,0 +1,10 @@
+[Unit]
+Description=Every 15 min: check the LLM still answers long prompts (ai-stack-model-watchdog)
+
+[Timer]
+OnBootSec=20min
+OnUnitActiveSec=15min
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,7 @@
+[Unit]
+Description=Email notification for failed unit %i (scripts/notify-failure.py)
+
+[Service]
+Type=oneshot
+User=ai
+ExecStart=/home/ai/ai-stack/scripts/notify-failure.py %i

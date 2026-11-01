@@ -1,0 +1,396 @@
+# ============================================================================
+#  Family AI Stack — ai-stack/docker-compose.yml  (HEAD NODE head: head)
+#
+#  This is the single source of truth for head. ~/docker-compose.yml is archived.
+#
+#  ACTIVE SERVICES (this file, head):
+#    splash        :3000  — MU/TH/UR boot screen; auto-redirects to open-webui :3001
+#    open-webui    :3001  — family chat UI; Authentik SSO; functions: vision router + deep research + context trimmer
+#    litellm       :4000  — unified LLM + embedding gateway (routes to sparkrun + ollama-local)
+#    glances       :61208 — system/GPU monitor (head node); worker at worker:61208
+#    monitor       :61207 — combined cluster dashboard (both nodes side by side)
+#    ollama-local  (internal only) — embedding model service; nomic-embed-text for RAG
+#    docling       (internal only) — document extraction; sits behind docling-orient-fix now
+#    docling-orient-fix :5001 — TEMPORARY proxy fixing docling-project/docling#3839 (see its README.md)
+#    comfyui       :8188  — image gen; CosXL Edit (~6.7 GB, concurrent w/ MiniMax) + FLUX.1-schnell (needs MiniMax stopped)
+#
+#  ACTIVE SERVICES (worker worker via worker-compose.yml):
+#    faster-whisper     :8005 — GPU STT (large-v3-turbo)
+#    chatterbox         :8004 — TTS server (direct)
+#    tts-proxy          :8006 — emotion proxy (OpenAI /v1/audio/speech → Chatterbox + exaggeration)
+#    wyoming-openai-tts :10300 — Wyoming→Chatterbox bridge for Home Assistant
+#    searxng            :8888 — private web search
+#
+#  EXTERNAL (sparkrun, outside Docker):
+#    MiniMax M2.7 NVFP4  :8002  (sparkrun run @official/minimax-m2.7-nvfp4-vllm --tp 2 --port 8002)
+#    Qwen3.5-122B FP8    :8003  (sparkrun run @eugr/qwen3.5-122b-fp8 --tp 2 --port 8003)
+#    GPT-OSS-120B        :8001  (sparkrun run local/gpt --tp 2 --port 8001)  [fallback, currently broken]
+#
+#  Bring up:  docker compose -f ~/ai-stack/docker-compose.yml up -d
+#  Stop:      docker compose -f ~/ai-stack/docker-compose.yml down
+#  Worker:    ssh ai@worker "cd ~/ai-stack && docker compose -f worker-compose.yml up -d"
+#
+#  After first start, pull the embedding model:
+#    docker exec ollama-local ollama pull nomic-embed-text:v1.5
+#
+#  ComfyUI note: COMFYUI_BASE_URL in open-webui is the only thing that needs to change
+#  if you ever move ComfyUI to another host. Stop comfyui here, update the URL, done.
+#
+#  Secrets: OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, HF_TOKEN are in ~/ai-stack/.env (not in git).
+# ============================================================================
+
+services:
+
+  splash:
+    image: nginx:alpine
+    container_name: splash
+    ports:
+      - "3000:80"
+    volumes:
+      - ./splash:/usr/share/nginx/html:ro
+    restart: unless-stopped
+
+  litellm:
+    # Pinned by digest 2026-10-24 = LiteLLM 1.106.3 (was 1.96.0; bumped for GHSA-7hp6-4w63-5g45).
+    # Images are signed with the cosign key from commit e82a3c6 since 1.103.8/1.106.x.
+    # Bump deliberately: test aliases + /v1/model/info (Context Trimmer reads it) after.
+    image: ghcr.io/berriai/litellm@sha256:74d0696a9f0afcc993c7659d246f0c542f003368298633e852228250779f1032
+    container_name: litellm
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]
+    ports:
+      - "4000:4000"
+    volumes:
+      - /home/ai/ai-stack/litellm-config.yaml:/app/config.yaml:ro
+      - /home/ai/ai-stack/litellm_hooks.py:/app/litellm_hooks.py:ro   # TaskDelay (-Task) + HA auto thinking
+      - /home/ai/ai-stack/functions/auto_thinking.py:/app/auto_thinking.py:ro   # rules shared with OpenWebUI
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      # No curl/wget in this image — use the venv's own python3. Diagnostic only:
+      # restart: unless-stopped fires on process exit, not on healthcheck failure,
+      # so this makes real status visible (docker ps, the monitor dashboard) but
+      # doesn't self-heal a wedged-but-alive process on its own.
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:4000/health/readiness', timeout=5).status == 200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+  open-webui:
+    # Pinned 2026-10-11 (was :main). Bump deliberately: upgrades run DB migrations, so
+    # rollback = previous image (tagged open-webui-rollback:<ver>) + volume snapshot.
+    image: ghcr.io/open-webui/open-webui:v0.12.3
+    container_name: open-webui
+    dns:
+      - lan-dns   # LAN DNS — resolves auth.example.com to LAN IP (split-horizon); must be first
+      - 127.0.0.11     # Docker embedded DNS fallback — preserves container service-name resolution
+    ports:
+      - "3001:8080"
+    networks:
+      - default
+      - google   # reaches google-mcp (Gmail/Calendar/Drive), which is on no other network
+    volumes:
+      - open-webui:/app/backend/data
+      - open-webui-cache:/root/.cache
+      - ./custom.css:/app/build/static/custom.css:ro
+    environment:
+      # Persisted 2026-08-03: without an explicit key, OpenWebUI generates a random
+      # WEBUI_SECRET_KEY per container instance (it lives outside the /app/backend/data
+      # mount), so every recreation (image pull, config change) silently invalidates all
+      # login sessions and any encrypted OAuth tokens. Value lives in .env (gitignored).
+      - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY}
+      # --- LLM backend via LiteLLM ---
+      - ENABLE_OPENAI_API=true
+      - OPENAI_API_BASE_URL=http://litellm:4000/v1
+      - OPENAI_API_KEY=${LITELLM_MASTER_KEY}
+      # --- Web search via SearXNG on worker ---
+      # Disabled: Deep Research tool handles web search explicitly and better.
+      # Native RAG web search fires on every message and fails to extract queries
+      # from MiniMax's reasoning format, producing "No search query generated" noise.
+      - ENABLE_RAG_WEB_SEARCH=false
+      - RAG_WEB_SEARCH_ENGINE=searxng
+      - SEARXNG_QUERY_URL=http://worker:8888/search?q=<query>
+      # --- TTS via tts-proxy on worker (emotion proxy → Chatterbox :8004) ---
+      # Note: active URL is persisted in DB; update via OpenWebUI Admin if changing.
+      - AUDIO_TTS_ENGINE=openai
+      - AUDIO_TTS_OPENAI_API_BASE_URL=http://worker:8006/v1
+      - AUDIO_TTS_OPENAI_API_KEY=${BACKEND_API_KEY}
+      - AUDIO_TTS_MODEL=tts-1
+      - AUDIO_TTS_VOICE=Abigail.wav
+      # --- STT via stt-bridge (below) -> NAS's Wyoming faster-whisper (shared with Home Assistant) ---
+      - AUDIO_STT_ENGINE=openai
+      - AUDIO_STT_OPENAI_API_BASE_URL=http://stt-bridge:8000/v1
+      - AUDIO_STT_OPENAI_API_KEY=${BACKEND_API_KEY}
+      # --- Image generation: ComfyUI on head ---
+      # To move ComfyUI to another host: update URL here + stop comfyui service.
+      - ENABLE_IMAGE_GENERATION=true
+      - IMAGE_GENERATION_ENGINE=comfyui
+      - COMFYUI_BASE_URL=http://head:8188
+      # --- Ollama connection: OFF (2026-10-11). LiteLLM is the only chat backend. The DB had
+      # pointed it at host.docker.internal:11434 (unreachable) and it errored on every start.
+      # The Auto Vision Router calls NAS Ollama directly via its own valve, not this.
+      - ENABLE_OLLAMA_API=false
+      - OLLAMA_BASE_URL=http://nas:11434
+      # --- Document extraction via Docling (structure-aware; better RAG than Tika) ---
+      # NOTE: this env var initializes the legacy uppercase DB key; runtime reads the lowercase key.
+      # On fresh volume: run the DB fix in STATUS.md First-Start to activate Docling properly.
+      - CONTENT_EXTRACTION_ENGINE=docling
+      - DOCLING_SERVER_URL=http://docling:5001
+      - PDF_EXTRACT_IMAGES=false
+      # --- RAG embeddings via nomic-embed-text on ollama-local → LiteLLM ---
+      - RAG_EMBEDDING_ENGINE=openai
+      - RAG_OPENAI_API_BASE_URL=http://litellm:4000/v1
+      - RAG_OPENAI_API_KEY=${LITELLM_MASTER_KEY}
+      - RAG_EMBEDDING_MODEL=nomic-embed-text:v1.5
+      # --- Authentik SSO ---
+      # Most settings are persisted in the DB after first boot; these serve as
+      # documented defaults and ensure correct values if the volume is recreated.
+      - ENABLE_OAUTH_SIGNUP=true
+      - OAUTH_MERGE_ACCOUNTS_BY_EMAIL=true
+      - OPENID_PROVIDER_URL=https://auth.example.com/application/o/open-web-ui/.well-known/openid-configuration
+      - OPENID_REDIRECT_URI=https://chat.example.com/oauth/oidc/callback
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+      - OAUTH_PROVIDER_NAME=Authentik
+      - OAUTH_SCOPES=openid email profile offline_access
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  ollama-local:
+    # Embedding model server — accessed internally by LiteLLM only.
+    # After first start: docker exec ollama-local ollama pull nomic-embed-text:v1.5
+    # nomic-embed-text:v1.5 — 768-dim, 8192-context (MRL/Matryoshka), ~275 MB, ~1 GB VRAM when loaded.
+    image: ollama/ollama:latest
+    container_name: ollama-local
+    volumes:
+      - ollama-local:/root/.ollama
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      # Keep the embedding model resident (323 MB). The default 5-min unload added ~1.85 s to the first
+      # chat message after idle, because OpenWebUI embeds every message for the memory lookup (measured 2026-10-11).
+      - OLLAMA_KEEP_ALIVE=-1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            # CDI, not the legacy `driver: nvidia` hook: with cgroup v2 + systemd, any
+            # `systemctl daemon-reload` (snapd does them) silently revokes a legacy-hook
+            # container's /dev/nvidia* access ("Failed to initialize NVML: Unknown Error").
+            # Needs /etc/cdi/nvidia.yaml; regenerate it after every driver update.
+            - driver: cdi
+              device_ids: [nvidia.com/gpu=all]
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  docling:
+    # Structure-aware document extraction — replaces Tika on the worker.
+    # Understands tables, headers, multi-column layouts, and section hierarchy.
+    # Better RAG quality: chunks carry structural context rather than raw text dumps.
+    # CPU-only; document processing is infrequent and does not need GPU acceleration.
+    # Pinned by digest 2026-10-11 = docling-serve 1.29.0 (was :latest). docling-orient-fix
+    # works around a docling bug (#3839), so re-test a rotated scan with ORIENT_FIX_ENABLED=false
+    # on any bump: if it passes, the proxy can go.
+    image: ghcr.io/docling-project/docling-serve@sha256:f8b324448e7c9e66083049727aaa90e3e65e88f0d7796624597a29d04183198b
+    container_name: docling
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    # NOTE: no longer exposed to the host on :5001 — open-webui talks to
+    # docling-orient-fix below instead, which proxies to this service. Nothing
+    # else in the stack calls docling directly.
+
+  stt-bridge:
+    # Speech-to-text for OpenWebUI. Translates OpenAI /v1/audio/transcriptions into Wyoming and
+    # forwards to the faster-whisper container on NAS (nas:10300, also used by Home
+    # Assistant). No model here, so no RAM/GPU on the Sparks. Replaced worker's faster-whisper
+    # 2026-10-11: that one never worked (arm64 CTranslate2 has no CUDA, and the model name was rejected).
+    build: ./stt-bridge
+    image: ai-stack-stt-bridge:latest
+    container_name: stt-bridge
+    ports:
+      - "8005:8000"
+    environment:
+      # Primary: OpenVINO Model Server on NAS's Arc A750, whisper-large-v3-turbo (container
+      # ovms-whisper, :8100). The Wyoming "fallback" below is NAS's wyoming-whisper adapter, which
+      # also forwards to ovms-whisper, so it's a second path, not a second model; the CPU
+      # faster-whisper it replaced is stopped (kept for rollback).
+      - STT_OPENAI_URL=http://nas:8100/v3
+      - STT_OPENAI_MODEL=whisper-large-v3-turbo
+      - WYOMING_HOST=nas
+      - WYOMING_PORT=10300
+      - STT_LANGUAGE=en   # "" = Whisper auto-detects (less reliable on short clips)
+    restart: unless-stopped
+
+  google-mcp:
+    # Gmail / Calendar / Drive for OpenWebUI (admin-only MCP connection). Self-hosted
+    # taylorwilsdon/google_workspace_mcp in single-user mode: it holds the admin's Google token
+    # itself, so anything that can reach it can read that mailbox. Hence: own network shared only
+    # with open-webui, host port on 127.0.0.1 only (for the one-time sign-in over an SSH tunnel).
+    # No upstream image: built from a pinned commit (v2.1.0). Plan + rationale: docs/GOOGLE_INTEGRATION.md
+    build: https://github.com/taylorwilsdon/google_workspace_mcp.git#789730452b9c5452b2c8d348cf005d196c12ba4e
+    image: ai-stack-google-mcp:2.1.0
+    container_name: google-mcp
+    command:
+      - >-
+        exec /app/.venv/bin/python main.py --transport streamable-http --single-user
+        --permissions gmail:drafts calendar:readonly drive:readonly
+        --disabled-tools send_gmail_message manage_gmail_label modify_gmail_message_labels
+        batch_modify_gmail_message_labels manage_gmail_filter
+    ports:
+      - "127.0.0.1:8007:8007"
+    environment:
+      - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID}
+      - GOOGLE_OAUTH_CLIENT_SECRET=${GOOGLE_OAUTH_CLIENT_SECRET}
+      - USER_GOOGLE_EMAIL=${USER_GOOGLE_EMAIL}
+      - PORT=8007
+      - WORKSPACE_MCP_PORT=8007
+      - WORKSPACE_MCP_HOST=0.0.0.0   # container-internal; exposure is limited by the network/ports above
+      - GOOGLE_OAUTH_REDIRECT_URI=http://localhost:8007/oauth2callback   # must match the OAuth client
+      - OAUTHLIB_INSECURE_TRANSPORT=1   # the localhost callback is plain http (Google allows that for localhost)
+      - GOOGLE_MCP_CREDENTIALS_DIR=/app/store_creds
+    volumes:
+      - google-mcp-creds:/app/store_creds
+    networks:
+      - google
+    restart: unless-stopped
+
+  docling-orient-fix:
+    # TEMPORARY workaround for docling-project/docling#3839 (upstream bug — see
+    # docling-orient-fix/README.md for the full story and exact removal steps once
+    # docling ships a fix). Docling correctly OCRs rotated/upside-down scans
+    # internally but drops the recognized text before final output. This proxy
+    # rotates pages to upright before docling ever sees them, sidestepping the bug.
+    # Set ORIENT_FIX_ENABLED=false to make this a pure passthrough without removing it.
+    build: ./docling-orient-fix
+    container_name: docling-orient-fix
+    environment:
+      - ORIENT_FIX_ENABLED=true
+      - DOCLING_UPSTREAM_URL=http://docling:5001
+    ports:
+      - "5001:5001"
+    depends_on:
+      docling:
+        condition: service_healthy
+    restart: unless-stopped
+
+  comfyui:
+    # Image generation on head (:8188).
+    # GB10 unified memory: ~11 GB available while MiniMax is running (measured via free -h).
+    #
+    # Edit workflow  → CosXL-edit.safetensors (~6.7 GB): fits with MiniMax running.
+    # Text-to-image  → FLUX.1-schnell (~14 GB total): requires stopping MiniMax first.
+    # Music gen      → ACE Step 1.5 Turbo (~9.3 GB): requires stopping MiniMax first.
+    #
+    # --lowvram keeps model weights in CPU-side unified RAM; ~4-6 GB VRAM peak during generation.
+    #
+    # Volume layout:
+    #   /comfy/mnt → ~/ComfyUI-Nvidia-Docker/run    (ComfyUI app + venv + user DB; bind mount preserves state)
+    #   /comfy/mnt/ComfyUI/extra_model_paths.yaml   (override: adds /app/ComfyUI/ as extra model search root)
+    #   /app/ComfyUI/models → ~/comfyui/models      (actual model files; resolved via extra_model_paths.yaml)
+    #   /comfy/mnt/ComfyUI/output → ~/comfyui/output  (output images on host)
+    #   /comfy/mnt/ComfyUI/custom_nodes → ~/comfyui/custom_nodes  (ACE-Step-ComfyUI and future nodes)
+    #
+    # To move to another host: stop this service + update COMFYUI_BASE_URL in open-webui above.
+    image: mmartial/comfyui-nvidia-docker:ubuntu24_cuda13.1-dgx-latest
+    container_name: comfyui
+    # Wraps the vendor image's own entrypoint with a fast corruption pre-flight check,
+    # then execs the real /comfyui-nvidia_init.bash — see comfyui-preflight.sh and
+    # docs/STATUS.md 2026-08-03 for why (interrupted-write corruption in venv/uv_cache).
+    entrypoint: ["/comfyui-preflight.sh"]
+    ports:
+      - "8188:8188"
+    volumes:
+      - /home/ai/ComfyUI-Nvidia-Docker/run:/comfy/mnt
+      # ORDER MATTERS: file bind must come after directory bind or the directory mount shadows it.
+      - /home/ai/ai-stack/comfyui-extra-model-paths.yaml:/comfy/mnt/ComfyUI/extra_model_paths.yaml:ro
+      - /home/ai/comfyui/models:/app/ComfyUI/models
+      - /home/ai/comfyui/output:/comfy/mnt/ComfyUI/output
+      - /home/ai/comfyui/custom_nodes:/comfy/mnt/ComfyUI/custom_nodes
+      - /home/ai/ai-stack/comfyui-preflight.sh:/comfyui-preflight.sh:ro
+    environment:
+      # COMFY_CMDLINE_EXTRA is read by /comfyui-nvidia_init.bash to append args to the python launch.
+      # command: override does NOT pass args to ComfyUI — the init script builds its own cmd string.
+      # --use-pytorch-cross-attention: this xformers build (0.0.35 dev, GB10/CUDA13) ships without
+      # the memory_efficient_attention/fmha module, so xformers attention crashes on every sampling
+      # step. Force native PyTorch SDPA instead until an xformers build with fmha for sm_121 lands.
+      - COMFY_CMDLINE_EXTRA=--lowvram --use-pytorch-cross-attention
+      - WANTED_UID=1000
+      - WANTED_GID=1000
+      - USE_UV=true
+      - FORCE_REINSTALL=false
+      - SECURITY_LEVEL=weak  # disables CSRF/auth on /api — intentional; access controlled at network layer
+      - USE_NEW_MANAGER=true
+      - ENABLE_MANAGER_LEGACY_UI=true
+      - HF_TOKEN=${HF_TOKEN}
+      - NCCL_P2P_DISABLE=1
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    deploy:
+      resources:
+        reservations:
+          devices:
+            # CDI, not the legacy `driver: nvidia` hook: with cgroup v2 + systemd, any
+            # `systemctl daemon-reload` (snapd does them) silently revokes a legacy-hook
+            # container's /dev/nvidia* access ("Failed to initialize NVML: Unknown Error").
+            # Needs /etc/cdi/nvidia.yaml; regenerate it after every driver update.
+            - driver: cdi
+              device_ids: [nvidia.com/gpu=all]
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  glances:
+    image: nicolargo/glances:latest-full
+    container_name: glances
+    hostname: head
+    pid: host
+    ports:
+      - "61208:61208"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /etc/os-release:/etc/os-release:ro
+    environment:
+      - GLANCES_OPT=-w --enable-plugin gpu
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    deploy:
+      resources:
+        reservations:
+          devices:
+            # CDI, not the legacy `driver: nvidia` hook: with cgroup v2 + systemd, any
+            # `systemctl daemon-reload` (snapd does them) silently revokes a legacy-hook
+            # container's /dev/nvidia* access ("Failed to initialize NVML: Unknown Error").
+            # Needs /etc/cdi/nvidia.yaml; regenerate it after every driver update.
+            - driver: cdi
+              device_ids: [nvidia.com/gpu=all]
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  monitor:
+    image: nginx:alpine
+    container_name: monitor
+    ports:
+      - "61207:80"
+    volumes:
+      - /home/ai/ai-stack/monitor:/usr/share/nginx/html:ro
+    restart: unless-stopped
+
+volumes:
+  google-mcp-creds:
+  open-webui:
+    external: true
+  open-webui-cache:
+    external: true
+    name: ai-stack_open-webui-cache  # pre-create on fresh deploy: docker volume create ai-stack_open-webui-cache
+  ollama-local:
+
+networks:
+  google:   # google-mcp + open-webui only

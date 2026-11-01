@@ -1,0 +1,39 @@
+---
+# Configure OpenCode to use LiteLLM as its backend.
+# OpenCode must be installed separately (see docs/README.md for install instructions).
+
+- name: Create OpenCode config directory
+  ansible.builtin.file:
+    path: "/home/{{ ansible_user }}/.config/opencode"
+    state: directory
+    mode: "0755"
+
+- name: Write OpenCode config
+  # "model" pins the default LiteLLM model_name (see ../../../litellm-config.yaml —
+  # there is no generic "coding" alias, each trial gets its own model_name, so this
+  # has to be repointed by hand whenever the active coding-model trial changes; it
+  # was stale at "coding" — a name that hasn't existed in litellm-config.yaml since
+  # before this repo tracked it — until fixed 2026-08-28). Override per-session with
+  # OpenCode's /models picker without touching this file.
+  ansible.builtin.copy:
+    dest: "/home/{{ ansible_user }}/.config/opencode/config.json"
+    mode: "0644"
+    content: |
+      {
+        "provider": "openai",
+        "model": "Qwen3.8-Flash-Next-NVFP4-Trial",
+        "openai": {
+          "apiKey": "{{ litellm_master_key }}",
+          "baseURL": "http://head:4000/v1"
+        }
+      }
+
+- name: Set LiteLLM env vars in .bashrc
+  ansible.builtin.lineinfile:
+    path: "/home/{{ ansible_user }}/.bashrc"
+    line: "{{ item }}"
+    state: present
+    regexp: "{{ item | regex_escape() }}"
+  loop:
+    - 'export OPENAI_API_BASE_URL="http://head:4000/v1"'
+    - 'export OPENAI_API_KEY="{{ litellm_master_key }}"'

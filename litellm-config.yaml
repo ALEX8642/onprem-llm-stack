@@ -1,0 +1,173 @@
+model_list:
+  # MiniMax M2.7 NVFP4 — best overall quality, strong at both coding and reasoning.
+  # Slower than Qwen but produces noticeably better results. Use this for most tasks.
+  # Start: switch-model.sh minimax
+  - model_name: MiniMax-M2.7-Best
+    litellm_params:
+      model: openai/nvidia/MiniMax-M2.7-NVFP4
+      api_base: http://head:8002/v1
+      api_key: os.environ/BACKEND_API_KEY
+      timeout: 300
+    # max_input_tokens here is read by the Context Trimmer OpenWebUI filter (functions/
+    # context_trimmer.py) via LiteLLM's /v1/model/info, to compute its compaction trigger
+    # as a percentage of whichever model is actually active — not a LiteLLM enforcement
+    # value. Keep in sync with each model's real --max-model-len/context-length.
+    model_info:
+      max_input_tokens: 98304
+
+  # Qwen3.5-122B FP8 — faster than MiniMax, slightly lower quality.
+  # Good for quick tasks where you don't need the best result.
+  # Start: switch-model.sh qwen3.5
+  - model_name: Qwen3.5-122B-Fast
+    litellm_params:
+      model: openai/Qwen/Qwen3.5-122B-A10B-FP8
+      api_base: http://head:8003/v1
+      api_key: os.environ/BACKEND_API_KEY
+      timeout: 600
+    # Recipe default (@eugr/qwen3.5-122b-fp8) — unconfirmed, this model has never actually
+    # been run on this cluster yet (see docs/MODELS.md). Update once it has been.
+    model_info:
+      max_input_tokens: 262144
+
+  # GPT-OSS-120B — backup only, currently broken (vllm-node-mxfp4 image regression).
+  # Do not use until image is rebuilt. See TROUBLESHOOTING.md.
+  # Start: switch-model.sh gpt-oss
+  - model_name: GPT-OSS-120B-Backup
+    litellm_params:
+      model: openai/openai/gpt-oss-120b
+      api_base: http://head:8001/v1
+      api_key: os.environ/BACKEND_API_KEY
+      timeout: 300
+
+  # DeepSeek-V4-Flash-0731 — TRIAL, unofficial community container (anemll/dspark-vllm-gx10).
+  # Stronger on agentic-coding benchmarks than MiniMax, unproven on general chat and
+  # stability (no soak-test data upstream). See docs/MODELS.md before trusting this.
+  # Start: switch-model.sh ds4flash
+  - model_name: DeepSeek-V4-Flash-0731-Trial
+    litellm_params:
+      # hosted_vllm/ (not openai/) — required for reasoning_effort passthrough. The
+      # generic openai/ provider validates params against OpenAI's own official list
+      # and 400s on reasoning_effort for a non-o1/o3/gpt-5 model name, even with
+      # allowed_openai_params set (tried both static config and dynamic per-request —
+      # neither worked, the param silently never reached vLLM). hosted_vllm's own
+      # HostedVLLMChatConfig explicitly lists reasoning_effort + thinking as supported
+      # params (see litellm/llms/hosted_vllm/chat/transformation.py) — it's LiteLLM's
+      # purpose-built provider type for exactly this case. Found/fixed 2026-08-08.
+      model: hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731
+      api_base: http://head:8000/v1
+      api_key: os.environ/BACKEND_API_KEY
+      timeout: 600
+    model_info:
+      max_input_tokens: 131072
+
+  # Same backend as above, reasoning forced off — see docs/MODELS.md "Thinking mode" section.
+  # No native per-message reasoning toggle exists in this OpenWebUI version (checked the
+  # frontend bundle: reasoning_effort only appears in the admin model-editor screen, not
+  # chat compose), so this is a second selectable model instead — same interaction users
+  # already have for picking between models. 2026-08-08.
+  - model_name: DeepSeek-V4-Flash-0731-Fast
+    litellm_params:
+      model: hosted_vllm/deepseek-ai/DeepSeek-V4-Flash-0731
+      api_base: http://head:8000/v1
+      api_key: os.environ/BACKEND_API_KEY
+      timeout: 600
+    model_info:
+      max_input_tokens: 131072
+
+  # Qwen3.8-Flash-Next-NVFP4 — TRIAL, community RadixArk quant, SGLang runtime. Recipe
+  # recovered from Spark Arena (no sparkrun-registry entry exists), pinned locally at
+  # scripts/recipes/qwen38-flash-next-nvfp4-sglang.yaml. Evaluated 2026-08-28 as the
+  # reasoning-slot candidate (Qwen3.5-122B never actually run on this cluster to compare
+  # against). openai/ provider is fine here (not hosted_vllm/) — this is SGLang, not vLLM,
+  # and the recipe already bakes reasoning_parser/tool_call_parser into its own launch
+  # command rather than needing per-request passthrough. See docs/MODELS.md for the
+  # NVFP4-vs-FP8 quality comparison and the memory tuning history — unlike MiniMax
+  # (0.70 floor) and ds4flash (0.85→0.80), this recipe's mem-fraction-static stayed at
+  # its own tested 0.78 default: NEXTN speculative decoding's draft weights eat nearly
+  # all the gap down to SGLang's hard floor (0.703), so there's no real slack to trim
+  # (0.75 already produces a KV pool smaller than the declared context). Only
+  # max_running_requests dropped 16→4 (one per family member).
+  # Since 2026-10-24 :8010 is served by the Atlas engine instead (switch-model.sh qwen38atlas, nvidia
+  # checkpoint, same served name, so these three entries didn't change); the SGLang notes above
+  # describe the rollback, switch-model.sh qwen38flash.
+  - model_name: Qwen3.8-Flash-Next-NVFP4-Trial
+    litellm_params:
+      model: openai/Qwen3.8-Flash-Next-NVFP4
+      api_base: http://head:8010/v1
+      api_key: os.environ/BACKEND_API_KEY
+      timeout: 300
+    model_info:
+      max_input_tokens: 262144
+
+  # Same backend, thinking forced off via a static extra_body merged into every request —
+  # same pattern as DeepSeek-V4-Flash-0731-Fast above. Confirmed empirically 2026-08-28:
+  # with no params at all this model thinks by default (reasoning_content populated,
+  # ~33 reasoning_tokens on a trivial arithmetic question) — same OpenWebUI limitation
+  # applies (no per-message chat_template_kwargs toggle in chat compose), so this is a
+  # second selectable model rather than a per-message switch.
+  - model_name: Qwen3.8-Flash-Next-NVFP4-Fast
+    litellm_params:
+      model: openai/Qwen3.8-Flash-Next-NVFP4
+      api_base: http://head:8010/v1
+      api_key: os.environ/BACKEND_API_KEY
+      timeout: 300
+      extra_body:
+        chat_template_kwargs:
+          enable_thinking: false
+    model_info:
+      max_input_tokens: 262144
+
+  # Same as -Fast, but litellm_hooks.TaskDelay holds each request back TASK_DELAY_SECONDS (4 s).
+  # OpenWebUI's task model (title/tags/follow-ups) and Auto Memory use it, so they don't compete
+  # with Chatterbox (worker GPU) for the first spoken sentence. See litellm_hooks.py.
+  - model_name: Qwen3.8-Flash-Next-NVFP4-Task
+    litellm_params:
+      model: openai/Qwen3.8-Flash-Next-NVFP4
+      api_base: http://head:8010/v1
+      api_key: os.environ/BACKEND_API_KEY
+      timeout: 300
+      extra_body:
+        chat_template_kwargs:
+          enable_thinking: false
+    model_info:
+      max_input_tokens: 262144
+
+  # nomic-embed-text v1.5 — local embedding model for OpenWebUI RAG.
+  # 768-dim, 8192-token context (vs 2048 in v1), ~275 MB, ~1 GB VRAM when loaded.
+  # Matryoshka embeddings (MRL) — same quality, longer document support.
+  # Pull: docker exec ollama-local ollama pull nomic-embed-text:v1.5
+  - model_name: nomic-embed-text:v1.5
+    litellm_params:
+      model: ollama/nomic-embed-text:v1.5
+      api_base: http://ollama-local:11434
+
+  # nomic-embed-text (legacy alias — kept so existing embeddings don't break)
+  - model_name: nomic-embed-text
+    litellm_params:
+      model: ollama/nomic-embed-text
+      api_base: http://ollama-local:11434
+
+router_settings:
+  routing_strategy: simple-shuffle
+  # num_retries only retries the SAME model_name's deployment (transient failures).
+  # Deliberately no `fallbacks` list: only one backend model runs at a time (see
+  # scripts/switch-model.sh), so cross-model fallback would silently answer from
+  # whichever model happens to be loaded instead of the one the user picked, with
+  # no indication anything was rerouted. A request for a model that isn't running
+  # now fails with a clear connection error instead.
+  num_retries: 2
+  timeout: 300
+  enable_pre_call_checks: true
+
+litellm_settings:
+  # litellm_hooks.py is mounted next to the config (/app); see docker-compose.yml.
+  # task_delay: -Task alias waits 4 s. ha_auto_thinking: OpenWebUI's Auto Thinking rules for Home
+  # Assistant's requests to -Trial (HA calls LiteLLM directly, bypassing OpenWebUI's filters).
+  callbacks: ["litellm_hooks.task_delay", "litellm_hooks.ha_auto_thinking"]
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  # Allow requests that specify the model by its backend name (pass-through)
+  infer_model_from_keys: true
+  # Spend tracking (useful for monitoring via /metrics endpoint)
+  store_model_in_db: false

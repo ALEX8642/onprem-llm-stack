@@ -1,0 +1,6 @@
+---
+- name: restart model-control-api
+  become: true
+  ansible.builtin.systemd:
+    name: ai-stack-model-control
+    state: restarted

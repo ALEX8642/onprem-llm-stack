@@ -1,0 +1,11 @@
+[Unit]
+Description=ai-stack model watchdog: long-prompt canary, auto-repair of the Qwen3.8 "!!!!" fault (scripts/model-watchdog.py)
+After=network-online.target ai-stack-model-control.service
+OnFailure=ai-stack-notify@%n.service
+
+[Service]
+Type=oneshot
+User=ai
+WorkingDirectory=/home/ai/ai-stack
+ExecStart=/usr/bin/python3 /home/ai/ai-stack/scripts/model-watchdog.py
+TimeoutStartSec=15min

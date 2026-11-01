@@ -1,0 +1,19 @@
+# Fixes two bugs in ghcr.io/anemll/dspark-vllm-gx10:0.1.1 found 2026-08-07/08 while
+# getting scripts/recipes/ds4flash-0731.yaml running via sparkrun (see docs/MODELS.md):
+#
+# 1. The image bakes ENTRYPOINT ["vllm","serve"]. sparkrun's Ray head/worker bootstrap
+#    step runs CMD=["bash","-c","<ray start ...>"] without overriding that entrypoint,
+#    so Docker concatenates them into `vllm serve bash -c "..."` — vLLM's arg parser
+#    then reads `-c` as its own --compilation-config short flag and crashes on
+#    "Invalid JSON" (the value is the rest of the ray-start wrapper string, not JSON).
+#    Confirmed via `docker inspect <container> --format '{{.Config.Entrypoint}}'`.
+# 2. Even past that, the image has no `ray` package installed at all
+#    (ModuleNotFoundError) despite the recipe requiring
+#    --distributed-executor-backend ray for cross-node TP — there's no simpler
+#    multi-host alternative in vLLM, so this is a hard requirement, not optional.
+#
+# Rebuild identically on both nodes if anemll ships a newer tag — check for a fix
+# upstream first (this Dockerfile is a workaround, not a permanent fork).
+FROM ghcr.io/anemll/dspark-vllm-gx10:0.1.1
+RUN pip install --no-cache-dir "ray[default]"
+ENTRYPOINT []

@@ -1,0 +1,13 @@
+[Unit]
+Description=ai-stack disaster-recovery backup (scripts/backup.sh --all; see docs/RECOVERY.md)
+After=network-online.target mnt-modelstore.mount
+Wants=network-online.target
+OnFailure=ai-stack-notify@%n.service
+
+[Service]
+Type=oneshot
+User=ai
+WorkingDirectory=/home/ai/ai-stack
+ExecStart=/home/ai/ai-stack/scripts/backup.sh --all
+Nice=10
+IOSchedulingClass=idle
