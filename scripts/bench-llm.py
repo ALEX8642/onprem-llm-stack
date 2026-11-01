@@ -13,6 +13,11 @@ so a faster recipe can't hide a regression. Stdlib only. Measures:
   vision     one tiny image (reports whether the endpoint accepts images at all)
 
 Usage: bench-llm.py --base http://head:8010/v1 --model NAME --out results.json [--only speed,quiz]
+
+Models that don't use Qwen's thinking switch or sampling (added 2026-10-29 for Command A+):
+  --think-kwarg reasoning   chat_template_kwargs key that turns thinking on/off (default enable_thinking)
+  --sampling server         send no temperature/top_p, so the server applies the model's own
+                            generation_config (default "bench": 0.6 / 0.95 for every model)
 """
 import argparse, base64, json, os, re, struct, sys, threading, time, urllib.request, zlib
 
@@ -22,6 +27,8 @@ P.add_argument("--model", required=True)
 P.add_argument("--key", default=os.environ.get("LITELLM_KEY", "none"))
 P.add_argument("--out", required=True)
 P.add_argument("--only", default="")
+P.add_argument("--think-kwarg", default="enable_thinking")
+P.add_argument("--sampling", choices=["bench", "server"], default="bench")
 A = P.parse_args()
 
 
@@ -35,9 +42,10 @@ def post(body, stream=False, timeout=900):
 
 def chat(messages, think, max_tokens=1024, stream=True, **extra):
     """Streams a completion. Returns dict with ttft, decode tok/s, content, reasoning, tool_calls, usage."""
-    body = {"model": A.model, "messages": messages, "max_tokens": max_tokens, "temperature": 0.6,
-            "top_p": 0.95, "stream": stream,
-            "chat_template_kwargs": {"enable_thinking": think}, **extra}
+    body = {"model": A.model, "messages": messages, "max_tokens": max_tokens, "stream": stream,
+            "chat_template_kwargs": {A.think_kwarg: think}, **extra}
+    if A.sampling == "bench":
+        body.update(temperature=0.6, top_p=0.95)
     if stream:
         body["stream_options"] = {"include_usage": True}
     t0 = time.time()
@@ -129,7 +137,8 @@ def tiny_png():
             + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b""))
 
 
-R = {"base": A.base, "model": A.model, "started": time.strftime("%Y-%m-%dT%H:%M:%S")}
+R = {"base": A.base, "model": A.model, "think_kwarg": A.think_kwarg, "sampling": A.sampling,
+     "started": time.strftime("%Y-%m-%dT%H:%M:%S")}
 only = set(filter(None, A.only.split(",")))
 
 
@@ -224,7 +233,7 @@ def s_tools():
             pass
         out["think_on" if think else "think_off"] = {
             "parsed": bool(tc) and tc["name"] == "get_weather" and "toronto" in str(args.get("city", "")).lower(),
-            "leaked_into_content": "get_weather" in r["content"] or "<tool_call" in r["content"],
+            "leaked_into_content": "get_weather" in r["content"] or "<tool_call" in r["content"] or "START_ACTION" in r["content"],
             "raw": (tc or {}), "content": r["content"][:200]}
     return out
 
@@ -232,7 +241,7 @@ def s_tools():
 def s_reasoning():
     r = chat([{"role": "user", "content": "Is 221 prime? Answer yes or no."}], True, 2048)
     return {"reasoning_chars": len(r["reasoning"]), "content": r["content"][:200],
-            "think_tags_in_content": "<think>" in r["content"] or "</think>" in r["content"]}
+            "think_tags_in_content": any(t in r["content"] for t in ("<think>", "</think>", "START_THINKING", "END_THINKING"))}
 
 
 def s_quiz():

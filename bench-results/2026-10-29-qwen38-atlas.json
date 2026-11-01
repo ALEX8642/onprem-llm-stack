@@ -1,0 +1,186 @@
+{
+ "base": "http://127.0.0.1:8010/v1",
+ "model": "Qwen3.8-Flash-Next-NVFP4",
+ "think_kwarg": "enable_thinking",
+ "sampling": "bench",
+ "started": "2026-10-29T20:17:14",
+ "speed": {
+  "off": {
+   "prose": {
+    "tps": 44.1,
+    "ttft": 0.13,
+    "tok": 386
+   },
+   "narrative": {
+    "tps": 43.8,
+    "ttft": 0.128,
+    "tok": 455
+   },
+   "summary": {
+    "tps": 54.5,
+    "ttft": 0.125,
+    "tok": 294
+   },
+   "coding": {
+    "tps": 83.6,
+    "ttft": 0.142,
+    "tok": 1024
+   },
+   "math": {
+    "tps": 73.0,
+    "ttft": 0.15,
+    "tok": 809
+   },
+   "json": {
+    "tps": 85.9,
+    "ttft": 0.218,
+    "tok": 660
+   },
+   "html": {
+    "tps": 75.0,
+    "ttft": 0.121,
+    "tok": 1024
+   },
+   "format": {
+    "tps": 55.0,
+    "ttft": 0.13,
+    "tok": 448
+   }
+  },
+  "on": {
+   "math": {
+    "tps": 67.0,
+    "ttft": 0.171,
+    "tok": 732
+   },
+   "coding": {
+    "tps": 76.4,
+    "ttft": 0.166,
+    "tok": 1993
+   }
+  },
+  "off_median_tps": 73.0,
+  "on_median_tps": 76.4
+ },
+ "concurrent": {
+  "x2": {
+   "per_stream_median_tps": 37.5,
+   "aggregate_tps": 66.5,
+   "max_ttft": 0.159
+  },
+  "x4": {
+   "per_stream_median_tps": 31.2,
+   "aggregate_tps": 116.2,
+   "max_ttft": 0.228
+  }
+ },
+ "multiturn": {
+  "prompt_tokens": 22437,
+  "turn1_ttft": 6.21,
+  "turn2_ttft": 0.31,
+  "turn2_correct": true,
+  "prefix_reuse_speedup": 20.0
+ },
+ "needle": {
+  "prompt_tokens": 93340,
+  "ttft": 26.8,
+  "prefill_tps": 3482,
+  "correct": true,
+  "answer": "7-3-9-1-4"
+ },
+ "tools": {
+  "think_off": {
+   "parsed": true,
+   "leaked_into_content": false,
+   "raw": {
+    "name": "get_weather",
+    "arguments": "{\"city\":\"Toronto\",\"unit\":\"celsius\"}"
+   },
+   "content": ""
+  },
+  "think_on": {
+   "parsed": true,
+   "leaked_into_content": false,
+   "raw": {
+    "name": "get_weather",
+    "arguments": "{\"city\":\"Toronto\",\"unit\":\"celsius\"}"
+   },
+   "content": "\n\n"
+  }
+ },
+ "reasoning": {
+  "reasoning_chars": 399,
+  "content": "\n\nNo. 221 = 13 \u00d7 17.",
+  "think_tags_in_content": false
+ },
+ "quiz": {
+  "score": "12/12",
+  "items": [
+   {
+    "q": "What is 17 * 23? Answer with just the number.",
+    "ok": true,
+    "a": "391"
+   },
+   {
+    "q": "How many r's are in the word 'strawberry'? Answer ",
+    "ok": true,
+    "a": "3"
+   },
+   {
+    "q": "What is the capital of Australia? One word.",
+    "ok": true,
+    "a": "Canberra"
+   },
+   {
+    "q": "If all bloops are razzies and all razzies are lazz",
+    "ok": true,
+    "a": "Yes."
+   },
+   {
+    "q": "What is the derivative of x^3 * sin(x)? Give the e",
+    "ok": true,
+    "a": "roduct rule**, where $u = x^3$ and $v = \\sin(x)$:\n\n$$\\frac{d}{dx}\\left[x^3 \\sin(x)\\right] = 3x^2 \\sin(x) + x^3 \\cos(x)$$"
+   },
+   {
+    "q": "A bat and a ball cost $1.10 total. The bat costs $",
+    "ok": true,
+    "a": "5"
+   },
+   {
+    "q": "What is the smallest prime number greater than 100",
+    "ok": true,
+    "a": "101"
+   },
+   {
+    "q": "Which planet has the most confirmed moons as of 20",
+    "ok": true,
+    "a": "Saturn"
+   },
+   {
+    "q": "Sort these numbers ascending and output them comma",
+    "ok": true,
+    "a": "3, 7, 19, 21, 42, 88"
+   },
+   {
+    "q": "What is the sum of the interior angles of a hexago",
+    "ok": true,
+    "a": "720"
+   },
+   {
+    "q": "Convert binary 101101 to decimal. Just the number.",
+    "ok": true,
+    "a": "45"
+   },
+   {
+    "q": "Who wrote 'Pride and Prejudice'? Full name.",
+    "ok": true,
+    "a": "Jane Austen"
+   }
+  ]
+ },
+ "vision": {
+  "answer": "Red",
+  "correct": true
+ },
+ "finished": "2026-10-29T20:20:38"
+}

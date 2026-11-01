@@ -1,0 +1,588 @@
+{
+ "model": "Qwen3.8-Flash-Next-NVFP4-Trial",
+ "base": "http://127.0.0.1:4000/v1",
+ "started": "2026-10-29T20:16:14",
+ "repeats": 3,
+ "concurrency": 1,
+ "system_prompt_chars": 11512,
+ "request": {
+  "temperature": 0.5,
+  "top_p": 1.0,
+  "max_tokens": 1024,
+  "tool_choice": "auto"
+ },
+ "score": {
+  "summary": {
+   "overall_accuracy": {
+    "n": 183,
+    "rate": 0.831
+   },
+   "tool_call_exact_match": {
+    "n": 102,
+    "rate": 0.912
+   },
+   "wrong_entity_rate": {
+    "n": 102,
+    "rate": 0.059
+   },
+   "missed_action_rate": {
+    "n": 102,
+    "rate": 0.0
+   },
+   "malformed_call_rate": {
+    "n": 183,
+    "rate": 0.016
+   },
+   "unnecessary_action_rate": {
+    "n": 81,
+    "rate": 0.235
+   },
+   "refusal_correctness": {
+    "n": 21,
+    "rate": 0.571
+   },
+   "clarify_correctness": {
+    "n": 15,
+    "rate": 0.4
+   },
+   "errors": 0,
+   "latency_s": {
+    "p50": 3.138,
+    "p95": 15.519
+   },
+   "by_category": {
+    "ambiguous": {
+     "n": 15,
+     "rate": 0.4
+    },
+    "chatter": {
+     "n": 12,
+     "rate": 1.0
+    },
+    "command": {
+     "n": 60,
+     "rate": 0.917
+    },
+    "multi": {
+     "n": 18,
+     "rate": 0.778
+    },
+    "near_collision": {
+     "n": 33,
+     "rate": 0.879
+    },
+    "question": {
+     "n": 24,
+     "rate": 1.0
+    },
+    "refuse": {
+     "n": 21,
+     "rate": 0.571
+    }
+   },
+   "overall_accuracy_excl_context_gap": {
+    "n": 174,
+    "rate": 0.856
+   },
+   "tool_call_exact_match_excl_context_gap": {
+    "n": 93,
+    "rate": 0.968
+   },
+   "unstable_items": [
+    "u11",
+    "u12",
+    "u13",
+    "u16",
+    "u26",
+    "u27",
+    "u31",
+    "u38"
+   ]
+  },
+  "misses": [
+   {
+    "id": "u12",
+    "rep": 0,
+    "utterance": "Turn off the basement air purifier",
+    "verdict": "wrong_entity",
+    "context_gap": true,
+    "calls": [
+     [
+      "fan.turn_off",
+      "fan.vital_200s_series"
+     ]
+    ],
+    "content": "I'll turn off the Vital 200S Series air purifier for you."
+   },
+   {
+    "id": "u33",
+    "rep": 0,
+    "utterance": "Turn off the kitchen lights",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "light.turn_off",
+      "light.basement_kitchen"
+     ],
+     [
+      "light.turn_off",
+      "light.bedroom_lightstrip"
+     ],
+     [
+      "light.turn_off",
+      "light.kitchen_strip_1"
+     ],
+     [
+      "light.turn_off",
+      "light.upstairs_kitchen"
+     ],
+     [
+      "light.turn_off",
+      "light.upstairs_kitchen_2"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u34",
+    "rep": 0,
+    "utterance": "Set the basement to tropical twilight",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "scene.turn_on",
+      "scene.basement_kitchen_tropical_twilight"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u36",
+    "rep": 0,
+    "utterance": "Start the vacuum",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "vacuum.start",
+      "vacuum.sir_suckalot"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u39",
+    "rep": 0,
+    "utterance": "Set the living room to relax and turn off the basement air purifier",
+    "verdict": "wrong_entity",
+    "context_gap": true,
+    "calls": [
+     [
+      "fan.turn_off",
+      "fan.vital_200s_series"
+     ],
+     [
+      "scene.turn_on",
+      "scene.theatre_relax"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u55",
+    "rep": 0,
+    "utterance": "Turn off the downstairs kitchen fridge",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "switch.turn_off",
+      "switch.downstairs_kitchen_fridge"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u56",
+    "rep": 0,
+    "utterance": "Turn off every device in the house",
+    "verdict": "malformed_call",
+    "context_gap": false,
+    "calls": [],
+    "content": ""
+   },
+   {
+    "id": "u58",
+    "rep": 0,
+    "utterance": "Shut off the water valve",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "switch.turn_off",
+      "switch.aqara_retrofit_valves_t1"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u11",
+    "rep": 1,
+    "utterance": "Turn off the air purifier in the master bedroom",
+    "verdict": "wrong_entity",
+    "context_gap": true,
+    "calls": [
+     [
+      "fan.turn_off",
+      "fan.core_600s_series"
+     ]
+    ],
+    "content": "I've turned off the Core 600S Series air purifier for you."
+   },
+   {
+    "id": "u31",
+    "rep": 1,
+    "utterance": "Turn off Downstairs bed 1",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "light.turn_off",
+      "light.hue_ambiance_spot_1"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u33",
+    "rep": 1,
+    "utterance": "Turn off the kitchen lights",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "light.turn_off",
+      "light.basement_kitchen"
+     ],
+     [
+      "light.turn_off",
+      "light.bedroom_lightstrip"
+     ],
+     [
+      "light.turn_off",
+      "light.kitchen_strip_1"
+     ],
+     [
+      "light.turn_off",
+      "light.upstairs_kitchen"
+     ],
+     [
+      "light.turn_off",
+      "light.upstairs_kitchen_2"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u34",
+    "rep": 1,
+    "utterance": "Set the basement to tropical twilight",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "scene.turn_on",
+      "scene.basement_kitchen_tropical_twilight"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u36",
+    "rep": 1,
+    "utterance": "Start the vacuum",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "vacuum.start",
+      "vacuum.sir_suckalot"
+     ]
+    ],
+    "content": "Starting Sir SuckAlot for you."
+   },
+   {
+    "id": "u38",
+    "rep": 1,
+    "utterance": "Turn off the TV and mute the receiver",
+    "verdict": "wrong_service",
+    "context_gap": false,
+    "calls": [
+     [
+      "media_player.mute",
+      "media_player.anthem_av"
+     ],
+     [
+      "media_player.turn_off",
+      "media_player.lg_webos_tv_oled83c6hup"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u39",
+    "rep": 1,
+    "utterance": "Set the living room to relax and turn off the basement air purifier",
+    "verdict": "wrong_entity",
+    "context_gap": true,
+    "calls": [
+     [
+      "fan.turn_off",
+      "fan.vital_200s_series"
+     ],
+     [
+      "scene.turn_on",
+      "scene.theatre_relax"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u55",
+    "rep": 1,
+    "utterance": "Turn off the downstairs kitchen fridge",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "switch.turn_off",
+      "switch.downstairs_kitchen_fridge"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u56",
+    "rep": 1,
+    "utterance": "Turn off every device in the house",
+    "verdict": "malformed_call",
+    "context_gap": false,
+    "calls": [],
+    "content": ""
+   },
+   {
+    "id": "u58",
+    "rep": 1,
+    "utterance": "Shut off the water valve",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "switch.turn_off",
+      "switch.aqara_retrofit_valves_t1"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u12",
+    "rep": 2,
+    "utterance": "Turn off the basement air purifier",
+    "verdict": "wrong_entity",
+    "context_gap": true,
+    "calls": [
+     [
+      "fan.turn_off",
+      "fan.vital_200s_series"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u13",
+    "rep": 2,
+    "utterance": "Start Sir SuckAlot",
+    "verdict": "wrong_service",
+    "context_gap": false,
+    "calls": [
+     [
+      "vacuum.turn_on",
+      "vacuum.sir_suckalot"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u16",
+    "rep": 2,
+    "utterance": "Mute the receiver",
+    "verdict": "wrong_service",
+    "context_gap": false,
+    "calls": [
+     [
+      "media_player.mute",
+      "media_player.anthem_av"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u26",
+    "rep": 2,
+    "utterance": "The TV just said red alert",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "scene.turn_on",
+      "scene.theatre_red_alert"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u27",
+    "rep": 2,
+    "utterance": "That was a total red alert moment, honestly",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "scene.turn_on",
+      "scene.theatre_red_alert"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u31",
+    "rep": 2,
+    "utterance": "Turn off Downstairs bed 1",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "light.turn_off",
+      "light.hue_ambiance_spot_1"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u33",
+    "rep": 2,
+    "utterance": "Turn off the kitchen lights",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "light.turn_off",
+      "light.basement_kitchen"
+     ],
+     [
+      "light.turn_off",
+      "light.bedroom_lightstrip"
+     ],
+     [
+      "light.turn_off",
+      "light.kitchen_strip_1"
+     ],
+     [
+      "light.turn_off",
+      "light.upstairs_kitchen"
+     ],
+     [
+      "light.turn_off",
+      "light.upstairs_kitchen_2"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u34",
+    "rep": 2,
+    "utterance": "Set the basement to tropical twilight",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "scene.turn_on",
+      "scene.basement_kitchen_tropical_twilight"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u36",
+    "rep": 2,
+    "utterance": "Start the vacuum",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "vacuum.start",
+      "vacuum.sir_suckalot"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u39",
+    "rep": 2,
+    "utterance": "Set the living room to relax and turn off the basement air purifier",
+    "verdict": "wrong_entity",
+    "context_gap": true,
+    "calls": [
+     [
+      "fan.turn_off",
+      "fan.vital_200s_series"
+     ],
+     [
+      "scene.turn_on",
+      "scene.theatre_relax"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u55",
+    "rep": 2,
+    "utterance": "Turn off the downstairs kitchen fridge",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "switch.turn_off",
+      "switch.downstairs_kitchen_fridge"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u56",
+    "rep": 2,
+    "utterance": "Turn off every device in the house",
+    "verdict": "malformed_call",
+    "context_gap": false,
+    "calls": [],
+    "content": ""
+   },
+   {
+    "id": "u58",
+    "rep": 2,
+    "utterance": "Shut off the water valve",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "switch.turn_off",
+      "switch.aqara_retrofit_valves_t1"
+     ]
+    ],
+    "content": "I'll try to shut off the Aqara Retrofit Valve, but note that it's currently showing as unavailable so it may not respond."
+   }
+  ]
+ }
+}

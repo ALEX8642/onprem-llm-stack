@@ -1,0 +1,41 @@
+# Command A+ W4A4 on 2x DGX Spark (TP=2) — EXPERIMENT (branch exp/command-a-plus, docs/experiments/command-a-plus.md).
+# Written 2026-10-29 from the model card; there is no sparkrun registry recipe for this model.
+#   Card: vLLM >= 0.25.0, cohere_melody >= 0.9.0, --tool-call-parser/--reasoning-parser cohere_command4,
+#   --enable-auto-tool-choice. Sampling (0.9 / 0.95 / rep 1.04) comes from the checkpoint's own
+#   generation_config.json, which vLLM applies by default.
+# Image: built by scripts/start-command-a-plus.sh from scripts/recipes/Dockerfile.command-a-plus.
+recipe_version: "2"
+model: CohereLabs/command-a-plus-05-2026-w4a4
+runtime: vllm
+min_nodes: 2
+container: command-a-plus-vllm:0.1
+
+metadata:
+  description: Command A+ W4A4 (NVFP4 MoE experts, BF16 attention and KV), 218B / 25B active
+
+defaults:
+  port: 8020
+  host: 0.0.0.0
+  tensor_parallel: 2
+  pipeline_parallel: 1
+  gpu_memory_utilization: 0.70
+  max_model_len: 131072
+  max_num_seqs: 4
+  revision: ebd2d72c0f9a84389c6b057136d38c435aea2700
+  served_model_name: Command-A-Plus-W4A4
+
+command: |
+  vllm serve {model} \
+    --revision {revision} \
+    --served-model-name {served_model_name} \
+    --gpu-memory-utilization {gpu_memory_utilization} \
+    -tp {tensor_parallel} \
+    -pp {pipeline_parallel} \
+    --max-model-len {max_model_len} \
+    --max-num-seqs {max_num_seqs} \
+    --enable-prefix-caching \
+    --enable-auto-tool-choice \
+    --tool-call-parser cohere_command4 \
+    --reasoning-parser cohere_command4 \
+    --host {host} \
+    --port {port}

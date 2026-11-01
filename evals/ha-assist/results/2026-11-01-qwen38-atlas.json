@@ -1,0 +1,535 @@
+{
+ "model": "Qwen3.8-Flash-Next-NVFP4-Trial",
+ "base": "http://127.0.0.1:4000/v1",
+ "started": "2026-11-01T14:37:17",
+ "repeats": 3,
+ "concurrency": 1,
+ "system_prompt_chars": 11303,
+ "request": {
+  "temperature": 0.5,
+  "top_p": 1.0,
+  "max_tokens": 1024,
+  "tool_choice": "auto"
+ },
+ "score": {
+  "summary": {
+   "overall_accuracy": {
+    "n": 183,
+    "rate": 0.863
+   },
+   "tool_call_exact_match": {
+    "n": 102,
+    "rate": 0.922
+   },
+   "wrong_entity_rate": {
+    "n": 102,
+    "rate": 0.049
+   },
+   "missed_action_rate": {
+    "n": 102,
+    "rate": 0.02
+   },
+   "malformed_call_rate": {
+    "n": 183,
+    "rate": 0.016
+   },
+   "unnecessary_action_rate": {
+    "n": 81,
+    "rate": 0.173
+   },
+   "refusal_correctness": {
+    "n": 21,
+    "rate": 0.857
+   },
+   "clarify_correctness": {
+    "n": 15,
+    "rate": 0.333
+   },
+   "errors": 0,
+   "latency_s": {
+    "p50": 3.263,
+    "p95": 14.797
+   },
+   "by_category": {
+    "ambiguous": {
+     "n": 15,
+     "rate": 0.333
+    },
+    "chatter": {
+     "n": 12,
+     "rate": 0.917
+    },
+    "command": {
+     "n": 60,
+     "rate": 0.933
+    },
+    "multi": {
+     "n": 18,
+     "rate": 0.778
+    },
+    "near_collision": {
+     "n": 33,
+     "rate": 0.909
+    },
+    "question": {
+     "n": 24,
+     "rate": 1.0
+    },
+    "refuse": {
+     "n": 21,
+     "rate": 0.857
+    }
+   },
+   "overall_accuracy_excl_context_gap": {
+    "n": 174,
+    "rate": 0.891
+   },
+   "tool_call_exact_match_excl_context_gap": {
+    "n": 93,
+    "rate": 0.978
+   },
+   "unstable_items": [
+    "u11",
+    "u12",
+    "u13",
+    "u26",
+    "u27",
+    "u31",
+    "u32",
+    "u37",
+    "u53"
+   ]
+  },
+  "misses": [
+   {
+    "id": "u11",
+    "rep": 0,
+    "utterance": "Turn off the air purifier in the master bedroom",
+    "verdict": "wrong_entity",
+    "context_gap": true,
+    "calls": [
+     [
+      "fan.turn_off",
+      "fan.core_600s_series"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u33",
+    "rep": 0,
+    "utterance": "Turn off the kitchen lights",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "light.turn_off",
+      "light.basement_kitchen"
+     ],
+     [
+      "light.turn_off",
+      "light.kitchen_strip_1"
+     ],
+     [
+      "light.turn_off",
+      "light.upstairs_kitchen"
+     ],
+     [
+      "light.turn_off",
+      "light.upstairs_kitchen_2"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u34",
+    "rep": 0,
+    "utterance": "Set the basement to tropical twilight",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "scene.turn_on",
+      "scene.basement_kitchen_tropical_twilight"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u36",
+    "rep": 0,
+    "utterance": "Start the vacuum",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "vacuum.start",
+      "vacuum.sir_suckalot"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u39",
+    "rep": 0,
+    "utterance": "Set the living room to relax and turn off the basement air purifier",
+    "verdict": "wrong_entity",
+    "context_gap": true,
+    "calls": [
+     [
+      "fan.turn_off",
+      "fan.vital_200s_series"
+     ],
+     [
+      "scene.turn_on",
+      "scene.theatre_relax"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u53",
+    "rep": 0,
+    "utterance": "so then she tells me, turn the lights off, and I said no way",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "light.turn_off",
+      "light.alex_room"
+     ],
+     [
+      "light.turn_off",
+      "light.basement_kitchen"
+     ],
+     [
+      "light.turn_off",
+      "light.bedroom_lightstrip"
+     ],
+     [
+      "light.turn_off",
+      "light.hue_white_spot_1"
+     ],
+     [
+      "light.turn_off",
+      "light.hue_white_spot_2"
+     ],
+     [
+      "light.turn_off",
+      "light.hue_white_spot_3"
+     ],
+     [
+      "light.turn_off",
+      "light.hue_white_spot_4"
+     ],
+     [
+      "light.turn_off",
+      "light.kitchen_strip_1"
+     ],
+     [
+      "light.turn_off",
+      "light.theatre"
+     ],
+     [
+      "light.turn_off",
+      "light.upstairs_kitchen"
+     ],
+     [
+      "light.turn_off",
+      "light.upstairs_kitchen_2"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u56",
+    "rep": 0,
+    "utterance": "Turn off every device in the house",
+    "verdict": "malformed_call",
+    "context_gap": false,
+    "calls": [],
+    "content": ""
+   },
+   {
+    "id": "u26",
+    "rep": 1,
+    "utterance": "The TV just said red alert",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "scene.turn_on",
+      "scene.theatre_red_alert"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u32",
+    "rep": 1,
+    "utterance": "Bedroom relax",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "scene.turn_on",
+      "scene.master_bedroom_relax"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u33",
+    "rep": 1,
+    "utterance": "Turn off the kitchen lights",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "light.turn_off",
+      "light.basement_kitchen"
+     ],
+     [
+      "light.turn_off",
+      "light.kitchen_strip_1"
+     ],
+     [
+      "light.turn_off",
+      "light.upstairs_kitchen"
+     ],
+     [
+      "light.turn_off",
+      "light.upstairs_kitchen_2"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u34",
+    "rep": 1,
+    "utterance": "Set the basement to tropical twilight",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "scene.turn_on",
+      "scene.basement_kitchen_tropical_twilight"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u36",
+    "rep": 1,
+    "utterance": "Start the vacuum",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "vacuum.start",
+      "vacuum.sir_suckalot"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u39",
+    "rep": 1,
+    "utterance": "Set the living room to relax and turn off the basement air purifier",
+    "verdict": "wrong_entity",
+    "context_gap": true,
+    "calls": [
+     [
+      "fan.turn_off",
+      "fan.vital_200s_series"
+     ],
+     [
+      "scene.turn_on",
+      "scene.theatre_relax"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u56",
+    "rep": 1,
+    "utterance": "Turn off every device in the house",
+    "verdict": "malformed_call",
+    "context_gap": false,
+    "calls": [],
+    "content": ""
+   },
+   {
+    "id": "u11",
+    "rep": 2,
+    "utterance": "Turn off the air purifier in the master bedroom",
+    "verdict": "missed",
+    "context_gap": true,
+    "calls": [],
+    "content": "Which air purifier should I switch off\u2014the Core 600S Series or the Vital 200S Series?"
+   },
+   {
+    "id": "u12",
+    "rep": 2,
+    "utterance": "Turn off the basement air purifier",
+    "verdict": "missed",
+    "context_gap": true,
+    "calls": [],
+    "content": "I see two air purifiers \u2014 the Core 600S Series and the Vital 200S Series \u2014 but neither is explicitly labeled as being in the basement. Which one would you like "
+   },
+   {
+    "id": "u13",
+    "rep": 2,
+    "utterance": "Start Sir SuckAlot",
+    "verdict": "wrong_service",
+    "context_gap": false,
+    "calls": [
+     [
+      "vacuum.turn_on",
+      "vacuum.sir_suckalot"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u27",
+    "rep": 2,
+    "utterance": "That was a total red alert moment, honestly",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "scene.turn_on",
+      "scene.theatre_red_alert"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u31",
+    "rep": 2,
+    "utterance": "Turn off Downstairs bed 1",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "light.turn_off",
+      "light.hue_ambiance_spot_1"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u33",
+    "rep": 2,
+    "utterance": "Turn off the kitchen lights",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "light.turn_off",
+      "light.basement_kitchen"
+     ],
+     [
+      "light.turn_off",
+      "light.kitchen_strip_1"
+     ],
+     [
+      "light.turn_off",
+      "light.upstairs_kitchen"
+     ],
+     [
+      "light.turn_off",
+      "light.upstairs_kitchen_2"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u34",
+    "rep": 2,
+    "utterance": "Set the basement to tropical twilight",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "scene.turn_on",
+      "scene.basement_kitchen_tropical_twilight"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u36",
+    "rep": 2,
+    "utterance": "Start the vacuum",
+    "verdict": "unnecessary_action",
+    "context_gap": false,
+    "calls": [
+     [
+      "vacuum.start",
+      "vacuum.sir_suckalot"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u37",
+    "rep": 2,
+    "utterance": "Turn off the living room lights and turn on the upstairs kitchen lights",
+    "verdict": "wrong_entity",
+    "context_gap": false,
+    "calls": [
+     [
+      "light.turn_off",
+      "light.hue_white_spot_1"
+     ],
+     [
+      "light.turn_off",
+      "light.hue_white_spot_2"
+     ],
+     [
+      "light.turn_off",
+      "light.hue_white_spot_3"
+     ],
+     [
+      "light.turn_off",
+      "light.hue_white_spot_4"
+     ],
+     [
+      "light.turn_off",
+      "light.theatre"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u39",
+    "rep": 2,
+    "utterance": "Set the living room to relax and turn off the basement air purifier",
+    "verdict": "wrong_entity",
+    "context_gap": true,
+    "calls": [
+     [
+      "fan.turn_off",
+      "fan.vital_200s_series"
+     ],
+     [
+      "scene.turn_on",
+      "scene.theatre_relax"
+     ]
+    ],
+    "content": ""
+   },
+   {
+    "id": "u56",
+    "rep": 2,
+    "utterance": "Turn off every device in the house",
+    "verdict": "malformed_call",
+    "context_gap": false,
+    "calls": [],
+    "content": ""
+   }
+  ]
+ }
+}

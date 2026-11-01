@@ -1,0 +1,12 @@
+# Command A+ W4A4 (CohereLabs/command-a-plus-05-2026-w4a4) on 2x GB10 — EXPERIMENT, branch exp/command-a-plus.
+#
+# The base image already has everything vLLM needs for this model (checked 2026-10-29):
+#   vLLM 0.26.1rc1 (card needs >= 0.25.0), Cohere2MoeForCausalLM + Cohere2VisionForConditionalGeneration,
+#   the cohere_command4 tool and reasoning parsers, and ray (sparkrun's cross-node TP).
+# The one missing piece is Cohere's melody library, which the card says W4A4 and accurate response
+# parsing need. 0.15.3 ships a cp312 aarch64 wheel and has no dependencies (pip dry run), so this
+# layer changes nothing else in the image.
+#
+# Base pinned by digest: it is the same image (ID 579e1d8145d8) already on both nodes as eugr/spark-vllm:latest.
+FROM eugr/spark-vllm@sha256:1d861bef8a6c0851140cec2575ebd32342d55bc0fd28ad4c6ca178269e9d1cff
+RUN pip install --no-cache-dir "cohere_melody==0.15.3"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Switch between models. Pulls weights from modelstore if not in local cache,
 # then stops the current model and starts the new one.
-# Usage: switch-model.sh minimax|qwen3.5|gpt-oss|ds4flash|qwen38flash|qwen38atlas
+# Usage: switch-model.sh minimax|qwen3.5|gpt-oss|ds4flash|qwen38flash|qwen38atlas|command-a
 
 set -euo pipefail
 
@@ -32,6 +32,7 @@ declare -A MODEL_CACHE_DIR=(
     [ds4flash]="models--deepseek-ai--DeepSeek-V4-Flash-0731"
     [qwen38flash]="models--RadixArk--Qwen3.8-Flash-Next-NVFP4"
     [qwen38atlas]="models--nvidia--Qwen3.8-Flash-Next-NVFP4"
+    [command-a]="models--CohereLabs--command-a-plus-05-2026-w4a4"
 )
 
 declare -A MODEL_SCRIPT=(
@@ -41,6 +42,7 @@ declare -A MODEL_SCRIPT=(
     [ds4flash]="start-ds4flash0731.sh"
     [qwen38flash]="start-qwen38-flash-next-nvfp4.sh"
     [qwen38atlas]="start-qwen38-flash-next-nvfp4-atlas.sh"
+    [command-a]="start-command-a-plus.sh"
 )
 
 log() { echo "[$(date '+%H:%M:%S')] $*"; }
@@ -54,6 +56,7 @@ usage() {
     echo "                                                see docs/MODELS.md before relying on it"
     echo "  qwen38atlas — Qwen3.8-Flash-Next-NVFP4 :8010  ACTIVE — nvidia checkpoint, Atlas engine"
     echo "  qwen38flash — Qwen3.8-Flash-Next-NVFP4 :8010  rollback — RadixArk quant, SGLang"
+    echo "  command-a — Command A+ W4A4 (vLLM)      :8020  EXPERIMENT (docs/experiments/command-a-plus.md), no LiteLLM alias"
     exit 1
 }
 
@@ -122,7 +125,7 @@ free_comfyui() {
 
 MODEL="$1"
 case "$MODEL" in
-    minimax|qwen3.5|gpt-oss|ds4flash|qwen38flash|qwen38atlas) ;;
+    minimax|qwen3.5|gpt-oss|ds4flash|qwen38flash|qwen38atlas|command-a) ;;
     *) echo "Unknown model: $MODEL"; usage ;;
 esac
 

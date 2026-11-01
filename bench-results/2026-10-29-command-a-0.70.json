@@ -1,0 +1,186 @@
+{
+ "base": "http://127.0.0.1:8020/v1",
+ "model": "Command-A-Plus-W4A4",
+ "think_kwarg": "reasoning",
+ "sampling": "server",
+ "started": "2026-10-29T20:42:55",
+ "speed": {
+  "off": {
+   "prose": {
+    "tps": 18.5,
+    "ttft": 0.209,
+    "tok": 1024
+   },
+   "narrative": {
+    "tps": 18.5,
+    "ttft": 0.214,
+    "tok": 1024
+   },
+   "summary": {
+    "tps": 18.7,
+    "ttft": 0.247,
+    "tok": 354
+   },
+   "coding": {
+    "tps": 18.4,
+    "ttft": 0.281,
+    "tok": 1024
+   },
+   "math": {
+    "tps": 18.5,
+    "ttft": 0.26,
+    "tok": 1024
+   },
+   "json": {
+    "tps": 18.4,
+    "ttft": 0.237,
+    "tok": 756
+   },
+   "html": {
+    "tps": 18.5,
+    "ttft": 0.249,
+    "tok": 1024
+   },
+   "format": {
+    "tps": 18.5,
+    "ttft": 0.214,
+    "tok": 477
+   }
+  },
+  "on": {
+   "math": {
+    "tps": 18.3,
+    "ttft": 0.164,
+    "tok": 1169
+   },
+   "coding": {
+    "tps": 17.6,
+    "ttft": 0.142,
+    "tok": 3926
+   }
+  },
+  "off_median_tps": 18.5,
+  "on_median_tps": 18.3
+ },
+ "concurrent": {
+  "x2": {
+   "per_stream_median_tps": 14.4,
+   "aggregate_tps": 28.7,
+   "max_ttft": 0.166
+  },
+  "x4": {
+   "per_stream_median_tps": 10.7,
+   "aggregate_tps": 38.1,
+   "max_ttft": 0.282
+  }
+ },
+ "multiturn": {
+  "prompt_tokens": 22539,
+  "turn1_ttft": 8.52,
+  "turn2_ttft": 0.36,
+  "turn2_correct": false,
+  "prefix_reuse_speedup": 23.5
+ },
+ "needle": {
+  "prompt_tokens": 93442,
+  "ttft": 40.3,
+  "prefill_tps": 2320,
+  "correct": false,
+  "answer": "0+4=4,  \u05d4\u05e9\u05e0\u05d4 \u05d4\u05d9\u05d0  2023.  \u05d4\u05ea\u05e9\u05d5\u05d1\u05d4 \u05d4\u05d9\u05d0  \"\u05d4\u05e9\u05d9\u05dc\u05d5\u05d1 \u05d4\u05d5\u05d0  7-3-9-"
+ },
+ "tools": {
+  "think_off": {
+   "parsed": true,
+   "leaked_into_content": true,
+   "raw": {
+    "name": "get_weather",
+    "arguments": "{\"city\": \"Toronto\", \"unit\": \"celsius\"}"
+   },
+   "content": "I need to call the get_weather function with:\n- city: \"Toronto\"\n- unit: \"celsius\"\n\nBoth parameters are provided, so I can proceed with the function call."
+  },
+  "think_on": {
+   "parsed": true,
+   "leaked_into_content": false,
+   "raw": {
+    "name": "get_weather",
+    "arguments": "{\"city\": \"Toronto\", \"unit\": \"celsius\"}"
+   },
+   "content": ""
+  }
+ },
+ "reasoning": {
+  "reasoning_chars": 357,
+  "content": "<|START_TEXT|>No.<|END_TEXT|>",
+  "think_tags_in_content": false
+ },
+ "quiz": {
+  "score": "11/12",
+  "items": [
+   {
+    "q": "What is 17 * 23? Answer with just the number.",
+    "ok": true,
+    "a": "<|START_TEXT|>391<|END_TEXT|>"
+   },
+   {
+    "q": "How many r's are in the word 'strawberry'? Answer ",
+    "ok": true,
+    "a": "<|START_TEXT|>3<|END_TEXT|>"
+   },
+   {
+    "q": "What is the capital of Australia? One word.",
+    "ok": true,
+    "a": "<|START_TEXT|>Canberra<|END_TEXT|>"
+   },
+   {
+    "q": "If all bloops are razzies and all razzies are lazz",
+    "ok": true,
+    "a": "<|START_TEXT|>Yes.<|END_TEXT|>"
+   },
+   {
+    "q": "What is the derivative of x^3 * sin(x)? Give the e",
+    "ok": false,
+    "a": "x)\\).\n\nPutting it together:\n\n\\[\n\\boxed{\\frac{d}{dx}\\big[x^3 \\sin(x)\\big] = 3x^{2}\\sin(x) + x^{3}\\cos(x)}.\n\\]<|END_TEXT|>"
+   },
+   {
+    "q": "A bat and a ball cost $1.10 total. The bat costs $",
+    "ok": true,
+    "a": "<|START_TEXT|>5<|END_TEXT|>"
+   },
+   {
+    "q": "What is the smallest prime number greater than 100",
+    "ok": true,
+    "a": "<|START_TEXT|>101<|END_TEXT|>"
+   },
+   {
+    "q": "Which planet has the most confirmed moons as of 20",
+    "ok": true,
+    "a": "<|START_TEXT|>Saturn<|END_TEXT|>"
+   },
+   {
+    "q": "Sort these numbers ascending and output them comma",
+    "ok": true,
+    "a": "<|START_TEXT|>3, 7, 19, 21, 42, 88<|END_TEXT|>"
+   },
+   {
+    "q": "What is the sum of the interior angles of a hexago",
+    "ok": true,
+    "a": "<|START_TEXT|>720<|END_TEXT|>"
+   },
+   {
+    "q": "Convert binary 101101 to decimal. Just the number.",
+    "ok": true,
+    "a": "<|START_TEXT|>45<|END_TEXT|>"
+   },
+   {
+    "q": "Who wrote 'Pride and Prejudice'? Full name.",
+    "ok": true,
+    "a": "ride and Prejudice* is **Jane Austen**. Her full name is simply Jane Austen (she did not use a middle name).<|END_TEXT|>"
+   }
+  ]
+ },
+ "vision": {
+  "answer": "The user asks: \"What single color fills this image? One word.\" The image presuma",
+  "correct": false
+ },
+ "finished": "2026-10-29T20:58:15"
+}

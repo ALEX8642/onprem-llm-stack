@@ -45,6 +45,7 @@ head                                 worker                           nas
 | `litellm-config.yaml`, `litellm_hooks.py` | Model aliases, deliberate no-fallback routing, request hooks |
 | `scripts/switch-model.sh`, `start-*.sh`, `stop-model.sh`, `recipes/` | One-at-a-time model lifecycle across both nodes (flock against concurrent switches) |
 | `scripts/bench-llm.py`, `bench-results/` | Evaluation harness and recorded runs |
+| `docs/experiments/`, `evals/ha-assist/` | Command A+ trial and the voice-agent tool-call eval |
 | `scripts/model-watchdog.py`, `systemd/` | Silent-fault canary on a 15-minute timer |
 | `scripts/smoke-test.sh` | Whole-stack check after reboots and upgrades |
 | `scripts/backup.sh`, `docs/RECOVERY.md` | Nightly DR backup and the rebuild runbook |
@@ -150,6 +151,19 @@ systemd's `OnFailure` alert.
   sees them. It works around upstream bug
   [docling#3839](https://github.com/docling-project/docling/issues/3839), which was filed from this
   stack.
+
+## Experiments
+
+- **[Cohere Command A+ W4A4 on two GB10 nodes](docs/experiments/command-a-plus.md).** The 218B MoE
+  ran TP=2 on the existing vLLM image plus one package, launched first try, and fit with
+  61.5 GiB/node of weights and a gpu-mem floor near 0.60. It was benchmarked against production
+  Qwen3.8 with the same harness. The harness needed two fairness fixes first: each model's own
+  thinking switch and its own sampling settings. The write-up includes what broke and an honest
+  verdict: Command A+ works, but for this stack it is slower and less accurate.
+- **[Home Assistant voice-agent eval](evals/ha-assist/README.md).** This replays 61 labelled
+  utterances through the exact request Home Assistant sends and scores the returned tool calls.
+  Nothing is executed. Results are reported by category with every miss listed, including a case
+  where a configuration change raised refusal correctness from 57% to 86% without changing the model.
 
 ## How this was built
 
